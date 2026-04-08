@@ -1,0 +1,1 @@
+"""GrowMate backend application package."""
