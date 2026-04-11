@@ -55,15 +55,32 @@ GrowMate replaces unpredictable LLM reasoning with verifiable algorithmic founda
    ```
    The interactive API documentation will be available at `http://localhost:8000/docs`.
 
+## 🧪 Testing
+
+We use `pytest` for all unit and integration testing. Ensure to run pytest through `uv` from within the `backend` folder where the virtual environment and configurations (`pyproject.toml`) live.
+
+```bash
+cd backend
+uv run pytest tests/
+```
+
+This testing suite ensures that internal agent algorithms like the Bayesian Hypothesis Tracker remain strictly bounded, dynamically adapt to error traces, and converge logically.
+
 ## 📦 Project Structure
 
 ```text
 backend/
-├── agents/             # Mocks & logic for Academic, Empathy, Strategy agents
+├── agents/             # Logic for Core Agents
+│   ├── base.py         # Interfaces (IAgent, AgentInput, AgentOutput, SessionState)
+│   ├── orchestrator.py # AgenticOrchestrator pipeline loop
+│   ├── academic_agent/ # Bayesian Tracker & HTN Planner
+│   ├── empathy_agent/  # Particle Filter
+│   └── strategy_agent/ # Q-Learning
 ├── api/
 │   ├── routes/         # RESTful endpoints (Sessions, Configurations, Inspection)
 │   └── ws/             # WebSockets for high-frequency telemetry tracking 
-├── core/               # Configuration, Security, and DB Client logic
+├── configs/            # YAML Config files for agent hyperparameters
+├── core/               # App configuration, LLM service, State Manager, Payload Formatter
 ├── models/             # Pydantic schemas for Request/Response validation
 ├── tests/              # Pytest unit and integration tests
 ├── Dockerfile          # Production Docker image (Multi-stage)

@@ -9,7 +9,7 @@ from core.security import get_current_user
 from core.memory_store import memory_store
 from agents.academic_agent.bayesian_tracker import bayesian_tracker
 from agents.academic_agent.htn_planner import htn_planner
-from agents.orchestrator import orchestrator
+# TODO: from agents.orchestrator import orchestrator
 
 router = APIRouter()
 

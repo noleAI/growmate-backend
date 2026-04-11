@@ -1,0 +1,40 @@
+# ⚠️ FILE NÀY ĐỂ TRỐNG CÁC CHI TIẾT TOÁN HỌC/QUY TẮC. 
+# Team sẽ điền sau khi xác nhận dữ liệu & chuyên gia.
+
+academic:
+  bayesian:
+    hypotheses: ["H01_Chain", "H02_ProdQuot", "H03_Trig", "H04_PowerExp", "H05_Notation", "H06_SecondDeriv", "H07_Concept", "H08_Proficient"]
+    prior_weights: {"H01_Chain": 0.22, "H02_ProdQuot": 0.18, "H03_Trig": 0.15, "H04_PowerExp": 0.12, "H05_Notation": 0.10, "H06_SecondDeriv": 0.08, "H07_Concept": 0.07, "H08_Proficient": 0.08}
+    likelihood_matrix_path: "data/derivative_priors.json"
+  htn:
+    root_task: "diagnose_derivative_concept"
+    primitive_tasks: []  # TODO: ["ask_mcq", "ask_numerical", "give_hint", "switch_topic", ...]
+    decomposition_rules_path: "configs/htn_rules_template.yaml"
+
+empathy:
+  particle_filter:
+    n_particles: 100
+    state_dimensions: []  # TODO: ["confusion_level", "fatigue_score"]
+    state_bounds: {}  # TODO: {"confusion_level": [0.0, 1.0], "fatigue_score": [0.0, 1.0]}
+    resampling_strategy: "systematic"  # systematic | multinomial
+    observation_noise_sigma: 0.05
+
+strategy:
+  q_learning:
+    states: []  # TODO: ["low_confusion_low_fatigue", "high_confusion_low_fatigue", ...]
+    actions: []  # TODO: ["next_question", "give_hint", "drill_practice", "de_stress", "escalate_hitl"]
+    alpha: 0.1
+    gamma: 0.9
+    epsilon_start: 0.3
+    epsilon_min: 0.05
+    q_table_seed_path: "data/q_table_seed.json"
+
+orchestrator:
+  self_monitor:
+    entropy_threshold: 0.75  # TODO: điều chỉnh sau khi test prior
+    pf_collapse_threshold: 0.15  # effective sample size / n_particles
+    q_stagnation_steps: 3
+  hitl:
+    timeout_sec: 3
+    fallback_action: "de_stress"
+    max_concurrent_queue: 5
