@@ -1,7 +1,10 @@
-import asyncio, json
-from typing import Dict, Any
+import json
+from typing import Any, Dict
+
 from supabase import create_client
+
 from agents.base import SessionState
+
 
 class StateManager:
     def __init__(self, supabase_url: str, supabase_key: str, ws_manager):
@@ -20,13 +23,18 @@ class StateManager:
     async def sync_to_supabase(self, session_id: str, state: SessionState):
         self.sync_counter[session_id] += 1
         if self.sync_counter[session_id] % 3 == 0:  # Sync mỗi 3 bước
-            await self._db_upsert("agent_state", {
-                "session_id": session_id,
-                "belief_dist": json.dumps(state.academic_state.get("belief_dist", {})),
-                "particles": json.dumps(state.empathy_state.get("particles", [])),
-                "q_values": json.dumps(state.strategy_state.get("q_table", {})),
-                "updated_at": "now()"
-            })
+            await self._db_upsert(
+                "agent_state",
+                {
+                    "session_id": session_id,
+                    "belief_dist": json.dumps(
+                        state.academic_state.get("belief_dist", {})
+                    ),
+                    "particles": json.dumps(state.empathy_state.get("particles", [])),
+                    "q_values": json.dumps(state.strategy_state.get("q_table", {})),
+                    "updated_at": "now()",
+                },
+            )
             self.sync_counter[session_id] = 0
 
     async def broadcast_ws(self, session_id: str, payload: Dict[str, Any]):

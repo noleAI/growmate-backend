@@ -1,12 +1,13 @@
-from agents.base import IAgent, AgentInput, AgentOutput
+from agents.base import AgentInput, AgentOutput, IAgent
+
 
 class QLearningAgent(IAgent):
     def __init__(self):
         self.q_table = {
             "state_1": {"action_a": 0.5, "action_b": 0.1},
-            "state_2": {"action_a": 0.0, "action_b": 0.9}
+            "state_2": {"action_a": 0.0, "action_b": 0.9},
         }
-    
+
     @property
     def name(self) -> str:
         return "strategy"
@@ -17,5 +18,6 @@ class QLearningAgent(IAgent):
 
     def update_q_value(self, state, action, reward, next_state):
         pass
+
 
 q_learning = QLearningAgent()

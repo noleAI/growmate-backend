@@ -2,6 +2,7 @@ from fastapi import APIRouter, WebSocket
 
 router = APIRouter()
 
+
 @router.websocket("/stream")
 async def websocket_dashboard(websocket: WebSocket):
     await websocket.accept()

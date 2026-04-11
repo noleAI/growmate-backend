@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     supabase_url: str
@@ -7,13 +9,14 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str
     environment: str = "development"
     debug: bool = False
-    
+
     # Internal thresholds
     hitl_uncertainty_threshold: float = 0.75
     exhaustion_threshold: float = 0.80
 
     class Config:
         env_file = ".env"
+
 
 @lru_cache()
 def get_settings():

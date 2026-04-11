@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
+
 
 class AgentInput(BaseModel):
     session_id: str
@@ -9,11 +11,13 @@ class AgentInput(BaseModel):
     behavior_signals: Optional[Dict[str, Any]] = None
     current_state: Dict[str, Any] = {}
 
+
 class AgentOutput(BaseModel):
     action: str
     payload: Dict[str, Any] = {}
     confidence: float = 0.5
     metadata: Dict[str, Any] = {}
+
 
 class IAgent(ABC):
     @abstractmethod
@@ -24,6 +28,7 @@ class IAgent(ABC):
     @abstractmethod
     def name(self) -> str:
         pass
+
 
 class SessionState(BaseModel):
     session_id: str

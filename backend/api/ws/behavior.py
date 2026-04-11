@@ -1,12 +1,13 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
-import asyncio
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from agents.empathy_agent.particle_filter import particle_filter
 from core.config import get_settings
 
 router = APIRouter()
 settings = get_settings()
+
 
 class ConnectionManager:
     def __init__(self):
@@ -23,7 +24,9 @@ class ConnectionManager:
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
 
+
 manager = ConnectionManager()
+
 
 @router.websocket("/{session_id}")
 async def behavior_websocket(websocket: WebSocket, session_id: str):
@@ -37,15 +40,23 @@ async def behavior_websocket(websocket: WebSocket, session_id: str):
                 # Update Particle Filter with observation
                 particle_filter.update(payload)
                 particle_filter.systematic_resample()
-                
+
                 # Check metrics
                 state_summary = particle_filter.get_state_summary()
-                if state_summary.get("uncertainty_score", 0) > settings.hitl_uncertainty_threshold:
-                    await manager.send_personal_message(json.dumps({
-                        "event": "intervention_proposed",
-                        "type": "recovery_mode",
-                        "confidence": 0.88
-                    }), websocket)
+                if (
+                    state_summary.get("uncertainty_score", 0)
+                    > settings.hitl_uncertainty_threshold
+                ):
+                    await manager.send_personal_message(
+                        json.dumps(
+                            {
+                                "event": "intervention_proposed",
+                                "type": "recovery_mode",
+                                "confidence": 0.88,
+                            }
+                        ),
+                        websocket,
+                    )
 
             except json.JSONDecodeError:
                 pass

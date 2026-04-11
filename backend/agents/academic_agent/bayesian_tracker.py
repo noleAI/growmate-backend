@@ -1,7 +1,9 @@
 import json
 import math
 import os
-from agents.base import IAgent, AgentInput, AgentOutput
+
+from agents.base import AgentInput, AgentOutput, IAgent
+
 
 class BayesianTracker(IAgent):
     def __init__(self, prior: dict = None):
@@ -21,31 +23,34 @@ class BayesianTracker(IAgent):
         return "bayesian"
 
     async def process(self, input_data: AgentInput) -> AgentOutput:
-        # Analyze runtime evidence based on behavior signals 
+        # Analyze runtime evidence based on behavior signals
         # and trigger the math bayesian model.
         if input_data.user_response:
             evidence = input_data.user_response.get("evidence", "E_CORRECT")
             self.update_evidence("answer_pattern", evidence)
-            
+
         return AgentOutput(
-            action="belief_updated", 
+            action="belief_updated",
             payload={"belief_dist": self.beliefs},
-            confidence=1.0 - self.get_entropy() # Inversely proportional to entropy
+            confidence=1.0 - self.get_entropy(),  # Inversely proportional to entropy
         )
-        
+
     def update_evidence(self, category: str, evidence: str) -> dict:
-        if category in self.config.get("likelihoods", {}) and evidence in self.config["likelihoods"][category]:
+        if (
+            category in self.config.get("likelihoods", {})
+            and evidence in self.config["likelihoods"][category]
+        ):
             likelihoods = self.config["likelihoods"][category][evidence]
-            
+
             # P(H|E) = (P(E|H) * P(H)) / P(E)
             unnormalized_posterior = {
                 h: self.beliefs.get(h, 0.0) * likelihoods.get(h, 0.0)
                 for h in self.beliefs
             }
-            
+
             # Compute Evidence P(E)
             marginal_likelihood = sum(unnormalized_posterior.values())
-            
+
             # Distribution normalization
             if marginal_likelihood > 0:
                 self.beliefs = {
@@ -59,10 +64,14 @@ class BayesianTracker(IAgent):
         evidence = outcome.get("evidence", "E_CORRECT")
         category = "answer_pattern" if action == "submit_answer" else "hint_used"
         return self.update_evidence(category, evidence)
-        
+
     def reset(self):
-        self.beliefs = self.config["priors"].copy() if "priors" in self.config else {"concept_a": 0.5, "concept_b": 0.5}
-        
+        self.beliefs = (
+            self.config["priors"].copy()
+            if "priors" in self.config
+            else {"concept_a": 0.5, "concept_b": 0.5}
+        )
+
     def get_entropy(self) -> float:
         # Entropy = -sum(p * log(p))
         entropy = 0.0
@@ -70,5 +79,6 @@ class BayesianTracker(IAgent):
             if p > 0:
                 entropy -= p * math.log(p)
         return entropy
-        
+
+
 bayesian_tracker = BayesianTracker()

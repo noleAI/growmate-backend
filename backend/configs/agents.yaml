@@ -9,7 +9,7 @@ academic:
   htn:
     root_task: "diagnose_derivative_concept"
     primitive_tasks: []  # TODO: ["ask_mcq", "ask_numerical", "give_hint", "switch_topic", ...]
-    decomposition_rules_path: "configs/htn_rules_template.yaml"
+    decomposition_rules_path: "configs/htn_rules.yaml"
 
 empathy:
   particle_filter:
