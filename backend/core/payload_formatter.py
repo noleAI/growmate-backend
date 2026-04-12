@@ -1,3 +1,6 @@
+from typing import Any, Dict
+
+
 def format_belief_distribution(raw_beliefs: dict) -> list[dict]:
     """
     Transforms the raw belief dict from the Bayesian Tracker
@@ -16,12 +19,39 @@ def format_particle_state(particles: list) -> dict:
     }
 
 
+def format_pf_payload(pf_state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "component": "empathy_agent",
+        "estimation": {
+            "confusion": round(float(pf_state.get("confusion", 0.0)), 3),
+            "fatigue": round(float(pf_state.get("fatigue", 0.0)), 3),
+            "uncertainty": round(float(pf_state.get("uncertainty", 1.0)), 3),
+        },
+        "particle_cloud": pf_state.get("particle_cloud", []),
+        "weights": pf_state.get("weights", []),
+        "ess": round(float(pf_state.get("ess", 0.0)), 1),
+        "step": int(pf_state.get("step", 0)),
+        "q_state": pf_state.get("q_state", ""),
+    }
+
+
 def format_dashboard_payload(
     state, final_action: str, final_action_payload: dict
 ) -> dict:
     """
     Formats the complete dashboard update payload emitted via websockets.
     """
+    empathy_state = state.empathy_state
+    if {
+        "confusion",
+        "fatigue",
+        "uncertainty",
+        "ess",
+        "particle_cloud",
+        "weights",
+    }.issubset(empathy_state.keys()):
+        empathy_state = format_pf_payload(empathy_state)
+
     return {
         "session_id": state.session_id,
         "step": state.step,
@@ -29,6 +59,6 @@ def format_dashboard_payload(
         "action_payload": final_action_payload,
         "hitl_pending": state.hitl_pending,
         "academic": state.academic_state,
-        "empathy": state.empathy_state,
+        "empathy": empathy_state,
         "strategy": state.strategy_state,
     }

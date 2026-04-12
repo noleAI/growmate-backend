@@ -14,8 +14,11 @@ academic:
 empathy:
   particle_filter:
     n_particles: 100
-    state_dimensions: []  # TODO: ["confusion_level", "fatigue_score"]
-    state_bounds: {}  # TODO: {"confusion_level": [0.0, 1.0], "fatigue_score": [0.0, 1.0]}
+    process_noise: 0.05
+    jitter_sigma: 0.01
+    ess_threshold_ratio: 0.5
+    state_dimensions: ["confusion", "fatigue"]
+    state_bounds: {"confusion": [0.0, 1.0], "fatigue": [0.0, 1.0]}
     resampling_strategy: "systematic"  # systematic | multinomial
     observation_noise_sigma: 0.05
 

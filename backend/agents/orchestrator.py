@@ -1,9 +1,13 @@
 import asyncio
 import logging
 import time
+from pathlib import Path
 from typing import Any, Dict
 
+import yaml
+
 from agents.base import AgentInput, AgentOutput, IAgent, SessionState
+from agents.empathy_agent.particle_filter import ParticleFilter
 from core.llm_service import LLMService
 from core.payload_formatter import format_dashboard_payload
 from core.state_manager import StateManager
@@ -18,11 +22,19 @@ class AgenticOrchestrator:
         self.agents = agents
         self.state_mgr = state_mgr
         self.llm = llm
-        # TODO: Điền threshold từ configs/agents.yaml sau
-        self.ENTROPY_THRESHOLD = 0.0
-        self.FATIGUE_THRESHOLD = 0.0
-        self.Q_STAGNATION_STEPS = 0
+        self.config = self._load_agent_config()
+        self.self_monitor_cfg = self.config.get("orchestrator", {}).get("self_monitor", {})
+
+        self.ENTROPY_THRESHOLD = float(self.self_monitor_cfg.get("entropy_threshold", 0.75))
+        self.FATIGUE_THRESHOLD = float(self.self_monitor_cfg.get("fatigue_threshold", 0.8))
+        self.Q_STAGNATION_STEPS = int(self.self_monitor_cfg.get("q_stagnation_steps", 3))
+        self.PF_COLLAPSE_THRESHOLD = float(
+            self.self_monitor_cfg.get("pf_collapse_threshold", 0.15)
+        )
         self.MAX_HTL_RETRIES = 3
+
+        pf_config = self.config.get("empathy", {}).get("particle_filter", {})
+        self.pf_agent = ParticleFilter(config=pf_config)
 
     async def run_session_step(
         self, session_id: str, payload: Dict[str, Any]
@@ -40,15 +52,30 @@ class AgenticOrchestrator:
             current_state=state.model_dump(),
         )
 
-        # 2. Chạy Agent Pipeline (có thể điều chỉnh thành gather nếu độc lập)
+        # 2. Chạy Agent Pipeline
         academic_out = await self.agents["academic"].process(agent_input)
         empathy_out = await self.agents["empathy"].process(agent_input)
-        strategy_out = await self.agents["strategy"].process(agent_input)
+
+        if not self._is_pf_payload(empathy_out.payload):
+            empathy_out = await self.pf_agent.process(agent_input)
+
+        if self._is_pf_unstable(empathy_out.payload):
+            self.pf_agent.reset(explicit_feedback={"confusion": 0.5, "fatigue": 0.5})
+            logger.warning("PF reset due to instability for session=%s", session_id)
+            empathy_out = await self.pf_agent.process(agent_input)
 
         # 3. Merge state
         state.academic_state.update(academic_out.payload)
         state.empathy_state.update(empathy_out.payload)
+
+        strategy_input = agent_input.model_copy(update={"current_state": state.model_dump()})
+        strategy_out = await self.agents["strategy"].process(strategy_input)
         state.strategy_state.update(strategy_out.payload)
+
+        q_state = state.empathy_state.get("q_state")
+        if q_state:
+            state.strategy_state["q_state"] = q_state
+
         state.step += 1
 
         # 4. Self-Monitor & HITL Check
@@ -90,7 +117,25 @@ class AgenticOrchestrator:
         }
 
     async def _check_self_monitor(self, state: SessionState) -> bool:
-        # TODO: Điền logic kiểm tra entropy, PF collapse, Q-stagnation sau
+        entropy = float(state.academic_state.get("entropy", 0.0))
+        fatigue = float(state.empathy_state.get("fatigue", 0.0))
+        ess = float(state.empathy_state.get("ess", 0.0))
+        particle_count = len(state.empathy_state.get("particle_cloud", []))
+        uncertainty = float(state.empathy_state.get("uncertainty", 0.0))
+
+        if entropy >= self.ENTROPY_THRESHOLD:
+            return True
+        if fatigue >= self.FATIGUE_THRESHOLD:
+            return True
+
+        if particle_count > 0:
+            ess_ratio = ess / particle_count
+            if ess_ratio <= self.PF_COLLAPSE_THRESHOLD:
+                return True
+
+        if uncertainty > 0.9:
+            return True
+
         return False
 
     async def _trigger_hitl(self, session_id: str, state: SessionState):
@@ -119,3 +164,36 @@ class AgenticOrchestrator:
 
     def _get_fallback_template(self, action_type: str) -> str:
         return ""
+
+    def _is_pf_payload(self, payload: Dict[str, Any]) -> bool:
+        required = {"confusion", "fatigue", "uncertainty", "ess", "particle_cloud", "weights"}
+        return required.issubset(payload.keys())
+
+    def _is_pf_unstable(self, payload: Dict[str, Any]) -> bool:
+        uncertainty = payload.get("uncertainty")
+        confusion = payload.get("confusion")
+        fatigue = payload.get("fatigue")
+
+        if uncertainty is None:
+            return True
+        if not self._is_finite_number(uncertainty):
+            return True
+        if not self._is_finite_number(confusion) or not self._is_finite_number(fatigue):
+            return True
+        return float(uncertainty) > 0.9
+
+    def _is_finite_number(self, value: Any) -> bool:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return False
+        return numeric == numeric and numeric not in (float("inf"), float("-inf"))
+
+    def _load_agent_config(self) -> Dict[str, Any]:
+        config_path = Path(__file__).resolve().parents[1] / "configs" / "agents.yaml"
+        if not config_path.exists():
+            logger.warning("Missing config file at %s. Falling back to defaults.", config_path)
+            return {}
+
+        with config_path.open("r", encoding="utf-8") as stream:
+            return yaml.safe_load(stream) or {}

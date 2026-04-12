@@ -23,6 +23,7 @@ class StateManager:
     async def sync_to_supabase(self, session_id: str, state: SessionState):
         self.sync_counter[session_id] += 1
         if self.sync_counter[session_id] % 3 == 0:  # Sync mỗi 3 bước
+            empathy_state = state.empathy_state
             await self._db_upsert(
                 "agent_state",
                 {
@@ -30,7 +31,14 @@ class StateManager:
                     "belief_dist": json.dumps(
                         state.academic_state.get("belief_dist", {})
                     ),
-                    "particles": json.dumps(state.empathy_state.get("particles", [])),
+                    "particles": json.dumps(
+                        empathy_state.get("particle_cloud", empathy_state.get("particles", []))
+                    ),
+                    "weights": json.dumps(empathy_state.get("weights", [])),
+                    "ess": empathy_state.get("ess", 0.0),
+                    "uncertainty": empathy_state.get("uncertainty", 1.0),
+                    "confusion": empathy_state.get("confusion", 0.0),
+                    "fatigue": empathy_state.get("fatigue", 0.0),
                     "q_values": json.dumps(state.strategy_state.get("q_table", {})),
                     "updated_at": "now()",
                 },
