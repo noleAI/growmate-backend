@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class AgentInput(BaseModel):
     session_id: str
+    student_id: Optional[str] = None
     question_id: Optional[str] = None
     user_response: Optional[Dict[str, Any]] = None
     behavior_signals: Optional[Dict[str, Any]] = None

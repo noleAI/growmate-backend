@@ -60,6 +60,40 @@ def test_discretize_logic(pf: ParticleFilter) -> None:
     assert pf.discretize_for_q() == "high_confusion_low_fatigue"
 
 
+@pytest.mark.asyncio
+async def test_process_emits_bridge_fields(pf: ParticleFilter) -> None:
+    output = await pf.process(
+        AgentInput(
+            session_id="sess-bridge-1",
+            behavior_signals={
+                "response_time_ms": 9500,
+                "error_rate": 0.5,
+                "correction_rate": 0.3,
+                "idle_time_ratio": 0.2,
+            },
+        )
+    )
+
+    payload = output.payload
+    assert "q_state" in payload
+    assert payload["q_state"] in {
+        "low_confusion_low_fatigue",
+        "low_confusion_high_fatigue",
+        "high_confusion_low_fatigue",
+        "high_confusion_high_fatigue",
+    }
+    assert "belief_distribution" in payload
+    assert set(payload["belief_distribution"].keys()) == {
+        "focused",
+        "confused",
+        "exhausted",
+        "frustrated",
+    }
+    assert "eu_values" in payload
+    assert "recommended_action" in payload
+    assert "hitl_triggered" in payload
+
+
 def test_fallback_on_nan_weights(pf: ParticleFilter) -> None:
     def invalid_likelihood(particles: np.ndarray, signals: Dict[str, float]) -> np.ndarray:
         del particles, signals
@@ -117,6 +151,30 @@ class _StrategyAgent(IAgent):
         return AgentOutput(action="next_question", payload={"q_state_seen": q_state})
 
 
+class _OverrideEmpathyAgent(IAgent):
+    @property
+    def name(self) -> str:
+        return "empathy"
+
+    async def process(self, input_data: AgentInput) -> AgentOutput:
+        del input_data
+        return AgentOutput(
+            action="empathy_tracked",
+            payload={
+                "confusion": 0.8,
+                "fatigue": 0.9,
+                "uncertainty": 0.95,
+                "ess": 4.0,
+                "particle_cloud": [[0.8, 0.9]] * 8,
+                "weights": [0.125] * 8,
+                "q_state": "high_confusion_high_fatigue",
+                "recommended_action": "suggest_break",
+                "override_recommended_action": "de_stress",
+                "hitl_triggered": True,
+            },
+        )
+
+
 class _StateManagerStub:
     def __init__(self):
         self.cache: Dict[str, SessionState] = {}
@@ -160,11 +218,35 @@ async def test_orchestrator_runs_pf_fallback_pipeline() -> None:
 
     state = await state_mgr.load_or_init("sess-pf-1")
 
-    assert result["action"] == "next_question"
+    assert result["action"] in {"next_question", "de_stress"}
     assert state.step == 1
     assert "confusion" in state.empathy_state
     assert "fatigue" in state.empathy_state
     assert "ess" in state.empathy_state
     assert "q_state" in state.strategy_state
+    assert "belief_distribution" in state.empathy_state
+    assert "eu_values" in state.empathy_state
     assert state_mgr.broadcasts
     assert state_mgr.broadcasts[0]["empathy"]["component"] == "empathy_agent"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_applies_empathy_override() -> None:
+    state_mgr = _StateManagerStub()
+    agents: Dict[str, IAgent] = {
+        "academic": _AcademicAgent(),
+        "empathy": _OverrideEmpathyAgent(),
+        "strategy": _StrategyAgent(),
+    }
+    orchestrator = AgenticOrchestrator(agents=agents, state_mgr=state_mgr, llm=_DummyLLM())
+
+    result = await orchestrator.run_session_step(
+        session_id="sess-pf-override",
+        payload={
+            "question_id": "q-override",
+            "response": {"answer": "B"},
+            "behavior_signals": {"response_time_ms": 14000},
+        },
+    )
+
+    assert result["action"] in {"de_stress", "hitl_pending"}

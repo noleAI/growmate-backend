@@ -1,0 +1,32 @@
+strategy:
+  alpha: 0.15
+  gamma: 0.9
+  epsilon_start: 0.3
+  epsilon_decay: 0.995
+  min_epsilon: 0.05
+  actions:
+    - show_hint
+    - drill_practice
+    - suggest_break
+    - continue_quiz
+    - trigger_hitl
+  state_keys:
+    - low_confusion_low_fatigue_high_mastery
+    - low_confusion_low_fatigue_low_mastery
+    - low_confusion_high_fatigue_high_mastery
+    - low_confusion_high_fatigue_low_mastery
+    - high_confusion_low_fatigue_high_mastery
+    - high_confusion_low_fatigue_low_mastery
+    - high_confusion_high_fatigue_high_mastery
+    - high_confusion_high_fatigue_low_mastery
+  expert_init:
+    # [state_key, action, q_value]
+    - ["low_confusion_low_fatigue_high_mastery", "continue_quiz", 0.9]
+    - ["low_confusion_low_fatigue_high_mastery", "drill_practice", 0.6]
+    - ["low_confusion_low_fatigue_low_mastery", "show_hint", 0.7]
+    - ["low_confusion_low_fatigue_low_mastery", "drill_practice", 0.5]
+    - ["high_confusion_low_fatigue_low_mastery", "show_hint", 0.8]
+    - ["high_confusion_low_fatigue_low_mastery", "trigger_hitl", 0.3]
+    - ["high_confusion_high_fatigue_low_mastery", "suggest_break", 0.9]
+    - ["high_confusion_high_fatigue_low_mastery", "trigger_hitl", 0.85]
+    - ["high_confusion_high_fatigue_low_mastery", "continue_quiz", -0.4]

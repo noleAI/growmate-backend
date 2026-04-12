@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def format_belief_distribution(raw_beliefs: dict) -> list[dict]:
@@ -32,11 +32,19 @@ def format_pf_payload(pf_state: Dict[str, Any]) -> Dict[str, Any]:
         "ess": round(float(pf_state.get("ess", 0.0)), 1),
         "step": int(pf_state.get("step", 0)),
         "q_state": pf_state.get("q_state", ""),
+        "belief_distribution": pf_state.get("belief_distribution", {}),
+        "particle_distribution": pf_state.get("particle_distribution", []),
+        "eu_values": pf_state.get("eu_values", {}),
+        "recommended_action": pf_state.get("recommended_action", ""),
+        "hitl_triggered": bool(pf_state.get("hitl_triggered", False)),
     }
 
 
 def format_dashboard_payload(
-    state, final_action: str, final_action_payload: dict
+    state,
+    final_action: str,
+    final_action_payload: dict,
+    orchestrator_decision: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """
     Formats the complete dashboard update payload emitted via websockets.
@@ -52,7 +60,7 @@ def format_dashboard_payload(
     }.issubset(empathy_state.keys()):
         empathy_state = format_pf_payload(empathy_state)
 
-    return {
+    payload = {
         "session_id": state.session_id,
         "step": state.step,
         "action": final_action,
@@ -62,3 +70,24 @@ def format_dashboard_payload(
         "empathy": empathy_state,
         "strategy": state.strategy_state,
     }
+
+    if orchestrator_decision:
+        payload["orchestrator"] = {
+            "component": "orchestrator",
+            "decision": {
+                "action": orchestrator_decision.get("action", ""),
+                "action_distribution": orchestrator_decision.get(
+                    "action_distribution", {}
+                ),
+                "total_uncertainty": orchestrator_decision.get(
+                    "total_uncertainty", 0.0
+                ),
+                "hitl_triggered": bool(
+                    orchestrator_decision.get("hitl_triggered", False)
+                ),
+                "rationale": orchestrator_decision.get("rationale", ""),
+            },
+            "monitoring": orchestrator_decision.get("monitoring", {}),
+        }
+
+    return payload

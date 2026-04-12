@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import config, inspection, session
+from api.routes import config, inspection, orchestrator, session
 from api.ws import behavior
 from core.config import get_settings
 
@@ -42,6 +42,11 @@ app.include_router(
 )  # Merged based on interact route
 app.include_router(inspection.router, prefix="/api/v1/inspection", tags=["Inspection"])
 app.include_router(config.router, prefix="/api/v1/configs", tags=["Config"])
+app.include_router(
+    orchestrator.router,
+    prefix="/api/v1/orchestrator",
+    tags=["Orchestrator"],
+)
 
 # WebSockets
 app.include_router(behavior.router, prefix="/ws/v1/behavior", tags=["WebSockets"])

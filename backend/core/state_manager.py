@@ -39,6 +39,16 @@ class StateManager:
                     "uncertainty": empathy_state.get("uncertainty", 1.0),
                     "confusion": empathy_state.get("confusion", 0.0),
                     "fatigue": empathy_state.get("fatigue", 0.0),
+                    "q_state": empathy_state.get("q_state", ""),
+                    "belief_distribution": json.dumps(
+                        empathy_state.get("belief_distribution", {})
+                    ),
+                    "particle_distribution": json.dumps(
+                        empathy_state.get("particle_distribution", [])
+                    ),
+                    "eu_values": json.dumps(empathy_state.get("eu_values", {})),
+                    "recommended_action": empathy_state.get("recommended_action", ""),
+                    "hitl_triggered": bool(empathy_state.get("hitl_triggered", False)),
                     "q_values": json.dumps(state.strategy_state.get("q_table", {})),
                     "updated_at": "now()",
                 },

@@ -44,4 +44,24 @@ def default_log_likelihood(
             2.0 * confidence_sigma**2
         )
 
+    error_rate = _as_finite_float(signals.get("error_rate"))
+    if error_rate is not None:
+        expected_error = 0.2 + 0.6 * confusion
+        error_sigma = 0.15
+        log_w += -((error_rate - expected_error) ** 2) / (2.0 * error_sigma**2)
+
+    correction_rate = _as_finite_float(signals.get("correction_rate"))
+    if correction_rate is not None:
+        expected_correction = 0.7 - 0.5 * confusion
+        correction_sigma = 0.2
+        log_w += -((correction_rate - expected_correction) ** 2) / (
+            2.0 * correction_sigma**2
+        )
+
+    idle_time_ratio = _as_finite_float(signals.get("idle_time_ratio"))
+    if idle_time_ratio is not None:
+        expected_idle = 0.1 + 0.4 * fatigue
+        idle_sigma = 0.15
+        log_w += -((idle_time_ratio - expected_idle) ** 2) / (2.0 * idle_sigma**2)
+
     return log_w

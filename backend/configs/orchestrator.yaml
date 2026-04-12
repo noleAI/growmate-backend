@@ -1,0 +1,55 @@
+orchestrator:
+  aggregator:
+    embedding_keys:
+      - academic_entropy
+      - academic_confidence
+      - empathy_confusion
+      - empathy_fatigue
+      - empathy_uncertainty
+      - memory_best_q
+      - memory_avg_reward
+    embedding_weights:
+      empathy_uncertainty: 1.0
+      academic_entropy: 1.0
+
+  policy:
+    actions:
+      - next_question
+      - show_hint
+      - drill_practice
+      - de_stress
+      - hitl
+    utility_rules:
+      next_question:
+        base: 0.2
+        feature_weights:
+          academic_confidence: 0.8
+          empathy_uncertainty: -0.4
+          empathy_fatigue: -0.3
+      show_hint:
+        base: 0.1
+        feature_weights:
+          academic_entropy: 0.9
+          empathy_confusion: 0.5
+      drill_practice:
+        base: 0.15
+        feature_weights:
+          academic_confidence: 0.5
+          empathy_fatigue: -0.6
+      de_stress:
+        base: 0.2
+        feature_weights:
+          empathy_fatigue: 1.0
+          empathy_uncertainty: 0.3
+          academic_confidence: -0.5
+      hitl:
+        base: -0.1
+        feature_weights:
+          empathy_uncertainty: 0.9
+          academic_entropy: 0.9
+
+  monitoring:
+    uncertainty_threshold: 0.6
+    uncertainty_weights:
+      academic: 0.4
+      empathy: 0.6

@@ -2,7 +2,7 @@ import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -11,6 +11,8 @@ from agents.empathy_agent.particle_filter import ParticleFilter
 from core.llm_service import LLMService
 from core.payload_formatter import format_dashboard_payload
 from core.state_manager import StateManager
+from orchestrator.engine import OrchestratorEngine
+from orchestrator.schemas import OrchestratorDecision
 
 logger = logging.getLogger("orchestrator")
 
@@ -24,6 +26,8 @@ class AgenticOrchestrator:
         self.llm = llm
         self.config = self._load_agent_config()
         self.self_monitor_cfg = self.config.get("orchestrator", {}).get("self_monitor", {})
+        orchestrator_cfg = self._load_orchestrator_config()
+        self.decision_engine = OrchestratorEngine(orchestrator_cfg.get("orchestrator", {}))
 
         self.ENTROPY_THRESHOLD = float(self.self_monitor_cfg.get("entropy_threshold", 0.75))
         self.FATIGUE_THRESHOLD = float(self.self_monitor_cfg.get("fatigue_threshold", 0.8))
@@ -34,6 +38,9 @@ class AgenticOrchestrator:
         self.MAX_HTL_RETRIES = 3
 
         pf_config = self.config.get("empathy", {}).get("particle_filter", {})
+        self.empathy_override_threshold = float(
+            pf_config.get("uncertainty_override_threshold", 0.75)
+        )
         self.pf_agent = ParticleFilter(config=pf_config)
 
     async def run_session_step(
@@ -42,10 +49,12 @@ class AgenticOrchestrator:
         """Luồng xử lý chính cho mỗi bước tương tác"""
         start_time = time.time()
         state = await self.state_mgr.load_or_init(session_id)
+        student_id = payload.get("student_id")
 
         # 1. Chuẩn bị input chung
         agent_input = AgentInput(
             session_id=session_id,
+            student_id=student_id,
             question_id=payload.get("question_id"),
             user_response=payload.get("response"),
             behavior_signals=payload.get("behavior_signals"),
@@ -78,15 +87,26 @@ class AgenticOrchestrator:
 
         state.step += 1
 
+        orchestrator_decision = self.decision_engine.run_step(
+            academic_state=state.academic_state,
+            empathy_state=state.empathy_state,
+            memory_state=state.strategy_state,
+        )
+        state.strategy_state["orchestrator_decision"] = orchestrator_decision.model_dump()
+
         # 4. Self-Monitor & HITL Check
-        hitl_triggered = await self._check_self_monitor(state)
+        hitl_triggered = await self._check_self_monitor(state, orchestrator_decision)
         if hitl_triggered and not state.hitl_pending:
             state.hitl_pending = True
             await self._trigger_hitl(session_id, state)
 
         # 5. Select Final Action (ưu tiên: HITL > Strategy > Academic Fallback)
         final_action = self._resolve_action(
-            academic_out, empathy_out, strategy_out, state.hitl_pending
+            academic_out,
+            empathy_out,
+            strategy_out,
+            state.hitl_pending,
+            orchestrator_decision,
         )
 
         # 6. LLM Augmentation (nếu cần)
@@ -101,7 +121,10 @@ class AgenticOrchestrator:
 
         # 7. Format & Broadcast
         dashboard_payload = format_dashboard_payload(
-            state, final_action, final_action_payload
+            state,
+            final_action,
+            final_action_payload,
+            orchestrator_decision=orchestrator_decision.model_dump(),
         )
         await self.state_mgr.broadcast_ws(session_id, dashboard_payload)
 
@@ -116,12 +139,23 @@ class AgenticOrchestrator:
             "latency_ms": latency_ms,
         }
 
-    async def _check_self_monitor(self, state: SessionState) -> bool:
+    async def _check_self_monitor(
+        self,
+        state: SessionState,
+        decision: Optional[OrchestratorDecision] = None,
+    ) -> bool:
         entropy = float(state.academic_state.get("entropy", 0.0))
         fatigue = float(state.empathy_state.get("fatigue", 0.0))
         ess = float(state.empathy_state.get("ess", 0.0))
         particle_count = len(state.empathy_state.get("particle_cloud", []))
-        uncertainty = float(state.empathy_state.get("uncertainty", 0.0))
+        uncertainty = float(
+            state.empathy_state.get(
+                "uncertainty", state.empathy_state.get("uncertainty_score", 0.0)
+            )
+        )
+
+        if decision and decision.hitl_triggered:
+            return True
 
         if entropy >= self.ENTROPY_THRESHOLD:
             return True
@@ -148,10 +182,28 @@ class AgenticOrchestrator:
         empathy: AgentOutput,
         strategy: AgentOutput,
         hitl_pending: bool,
+        decision: Optional[OrchestratorDecision] = None,
     ) -> str:
         if hitl_pending:
             return "hitl_pending"
-        return strategy.action  # Ưu tiên Q-policy, fallback academic.action
+
+        if decision and decision.action:
+            if decision.action not in {"hitl", "hitl_pending"}:
+                return str(decision.action)
+
+        empathy_payload = empathy.payload or {}
+        uncertainty = empathy_payload.get("uncertainty", empathy_payload.get("uncertainty_score", 0.0))
+        override_action = empathy_payload.get("override_recommended_action")
+        hitl_triggered = bool(empathy_payload.get("hitl_triggered", False))
+
+        if self._is_finite_number(uncertainty):
+            if float(uncertainty) >= self.empathy_override_threshold and override_action:
+                return str(override_action)
+
+        if hitl_triggered and override_action:
+            return str(override_action)
+
+        return strategy.action if strategy.action else academic.action
 
     async def _call_llm_with_fallback(self, action_type: str, state: SessionState):
         prompt = self._build_prompt(action_type, state)
@@ -180,7 +232,7 @@ class AgenticOrchestrator:
             return True
         if not self._is_finite_number(confusion) or not self._is_finite_number(fatigue):
             return True
-        return float(uncertainty) > 0.9
+        return False
 
     def _is_finite_number(self, value: Any) -> bool:
         try:
@@ -193,6 +245,18 @@ class AgenticOrchestrator:
         config_path = Path(__file__).resolve().parents[1] / "configs" / "agents.yaml"
         if not config_path.exists():
             logger.warning("Missing config file at %s. Falling back to defaults.", config_path)
+            return {}
+
+        with config_path.open("r", encoding="utf-8") as stream:
+            return yaml.safe_load(stream) or {}
+
+    def _load_orchestrator_config(self) -> Dict[str, Any]:
+        config_path = Path(__file__).resolve().parents[1] / "configs" / "orchestrator.yaml"
+        if not config_path.exists():
+            logger.warning(
+                "Missing orchestrator config at %s. Falling back to defaults.",
+                config_path,
+            )
             return {}
 
         with config_path.open("r", encoding="utf-8") as stream:
