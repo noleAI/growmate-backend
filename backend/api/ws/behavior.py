@@ -2,6 +2,7 @@ import json
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from agents.base import AgentInput
 from agents.empathy_agent.particle_filter import particle_filter
 from core.config import get_settings
 
@@ -37,29 +38,51 @@ async def behavior_websocket(websocket: WebSocket, session_id: str):
             data = await websocket.receive_text()
             try:
                 payload = json.loads(data)
-                # Update Particle Filter with observation
-                particle_filter.update(payload)
-                particle_filter.systematic_resample()
+                if not isinstance(payload, dict):
+                    payload = {}
 
-                # Check metrics
-                state_summary = particle_filter.get_state_summary()
-                if (
-                    state_summary.get("uncertainty_score", 0)
-                    > settings.hitl_uncertainty_threshold
-                ):
+                pf_output = await particle_filter.process(
+                    AgentInput(
+                        session_id=session_id,
+                        behavior_signals=payload,
+                    )
+                )
+
+                state_payload = pf_output.payload
+                uncertainty = float(
+                    state_payload.get(
+                        "uncertainty", state_payload.get("uncertainty_score", 1.0)
+                    )
+                )
+
+                if uncertainty > settings.hitl_uncertainty_threshold:
                     await manager.send_personal_message(
                         json.dumps(
                             {
                                 "event": "intervention_proposed",
                                 "type": "recovery_mode",
-                                "confidence": 0.88,
+                                "confidence": round(max(0.0, 1.0 - uncertainty), 3),
+                                "session_id": session_id,
+                                "state_summary": {
+                                    "confusion": state_payload.get("confusion", 0.0),
+                                    "fatigue": state_payload.get("fatigue", 0.0),
+                                    "uncertainty": uncertainty,
+                                },
                             }
                         ),
                         websocket,
                     )
 
             except json.JSONDecodeError:
-                pass
+                await manager.send_personal_message(
+                    json.dumps(
+                        {
+                            "event": "invalid_payload",
+                            "message": "Expected valid JSON payload.",
+                        }
+                    ),
+                    websocket,
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

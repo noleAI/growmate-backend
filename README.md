@@ -10,7 +10,13 @@ GrowMate replaces unpredictable LLM reasoning with verifiable algorithmic founda
 1. **Academic Agent**: Uses Bayesian Hypothesis Tracking & HTN Planning (Hierarchical Task Networks) with self-repair to diagnose root-cause knowledge gaps.
 2. **Empathy Agent**: Streams fast telemetry via WebSockets and uses Particle Filter State Estimation to track user exhaustion or confusion. 
 3. **Strategy Agent**: Uses Reinforcement Learning (Q-Learning) and long-term memory to adapt personalized learning paths.
-4. **Orchestrator**: Acts as a state machine monitoring uncertainties and initiating Human-in-the-Loop (HITL) triggers when confidence drops.
+4. **Orchestrator**: Aggregates agent state, applies deterministic utility policy, monitors uncertainty, and triggers Human-in-the-Loop (HITL) escalation when confidence drops.
+
+The orchestration layer is now split into modular components under `backend/orchestrator/`:
+- `aggregator.py`: builds a normalized state embedding from academic/empathy/memory signals.
+- `policy.py`: deterministic utility scoring and action distribution.
+- `monitoring.py`: weighted uncertainty calculation and HITL threshold check.
+- `engine.py`: composes the above into one decision output contract.
 
 ## ⚙️ Tech Stack
 
@@ -64,6 +70,12 @@ cd backend
 uv run pytest tests/
 ```
 
+Or run from repository root:
+
+```bash
+uv run pytest backend/tests/
+```
+
 This testing suite ensures that internal agent algorithms like the Bayesian Hypothesis Tracker remain strictly bounded, dynamically adapt to error traces, and converge logically.
 
 ## 📦 Project Structure
@@ -76,9 +88,10 @@ backend/
 │   ├── academic_agent/ # Bayesian Tracker & HTN Planner
 │   ├── empathy_agent/  # Particle Filter
 │   └── strategy_agent/ # Q-Learning
+├── orchestrator/       # Modular orchestrator components (aggregator/policy/monitoring/engine)
 ├── api/
-│   ├── routes/         # RESTful endpoints (Sessions, Configurations, Inspection)
-│   └── ws/             # WebSockets for high-frequency telemetry tracking 
+│   ├── routes/         # REST endpoints (sessions, orchestrator, configs, inspection)
+│   └── ws/             # WebSockets (behavior + dashboard streams)
 ├── configs/            # YAML Config files for agent hyperparameters
 ├── core/               # App configuration, LLM service, State Manager, Payload Formatter
 ├── models/             # Pydantic schemas for Request/Response validation
@@ -91,9 +104,17 @@ backend/
 ## 🔍 API & Inspection Dashboard
 
 GrowMate prioritizes extreme **transparency** and **auditability**. The API features dedicated `/api/v1/inspection` endpoints, which emit raw algorithmic states for external dashboards:
-- `/belief-state`: Internal probabilities of the Bayesian Tracker.
-- `/particle-state`: Current dispersion variables for the Empathy agent.
+- `/belief-state/{session_id}`: Internal probabilities of the Bayesian Tracker.
+- `/particle-state/{session_id}`: Current dispersion variables for the Empathy agent.
 - `/q-values`: Explored states in the Q-Learning environment.
-- `/audit-logs`: Immutable ledger of systemic decisions.
+- `/audit-logs/{session_id}`: Immutable ledger of systemic decisions.
+
+Additional orchestration endpoint:
+- `POST /api/v1/orchestrator/step`: Runs one orchestrator decision step using session state + behavior signals.
+
+WebSocket channels:
+- `/ws/v1/behavior/{session_id}`: behavior telemetry ingestion.
+- `/ws/v1/dashboard/stream`: subscribe to all dashboard updates.
+- `/ws/v1/dashboard/stream/{session_id}`: subscribe to one session dashboard stream.
 
 For further implementation details regarding endpoints, please check the [API.md](./API.md) documentation in the repository.

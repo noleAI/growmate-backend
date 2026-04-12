@@ -80,7 +80,7 @@ async def interact(
     if not isinstance(behavior_signals, dict):
         behavior_signals = {}
 
-    orchestrator = get_orchestrator()
+    orchestrator = get_orchestrator(session_id=session_id)
     payload = {
         "question_id": request.quiz_id or request.action_type,
         "response": response_data,

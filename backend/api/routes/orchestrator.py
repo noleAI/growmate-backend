@@ -22,7 +22,7 @@ async def run_orchestrator_step(
     request: OrchestratorStepRequest,
     user: dict = current_user_dependency,
 ):
-    orchestrator = get_orchestrator()
+    orchestrator = get_orchestrator(session_id=request.session_id)
     payload = {
         "question_id": request.question_id,
         "response": request.response,

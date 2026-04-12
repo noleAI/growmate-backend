@@ -175,10 +175,32 @@ class _OverrideEmpathyAgent(IAgent):
         )
 
 
+class _SupabaseTableStub:
+    def __init__(self, sink: list[dict]):
+        self.sink = sink
+
+    def insert(self, payload: dict):
+        self.sink.append(payload)
+        return self
+
+    def execute(self):
+        return {"status": "ok"}
+
+
+class _SupabaseStub:
+    def __init__(self):
+        self.audit_logs: list[dict] = []
+
+    def table(self, table_name: str) -> _SupabaseTableStub:
+        assert table_name == "audit_logs"
+        return _SupabaseTableStub(self.audit_logs)
+
+
 class _StateManagerStub:
     def __init__(self):
         self.cache: Dict[str, SessionState] = {}
         self.broadcasts: list[dict] = []
+        self.supabase = _SupabaseStub()
 
     async def load_or_init(self, session_id: str) -> SessionState:
         if session_id not in self.cache:
@@ -250,3 +272,28 @@ async def test_orchestrator_applies_empathy_override() -> None:
     )
 
     assert result["action"] in {"de_stress", "hitl_pending"}
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_hitl_emits_ws_and_audit_log() -> None:
+    state_mgr = _StateManagerStub()
+    agents: Dict[str, IAgent] = {
+        "academic": _AcademicAgent(),
+        "empathy": _OverrideEmpathyAgent(),
+        "strategy": _StrategyAgent(),
+    }
+    orchestrator = AgenticOrchestrator(agents=agents, state_mgr=state_mgr, llm=_DummyLLM())
+
+    result = await orchestrator.run_session_step(
+        session_id="sess-pf-hitl",
+        payload={
+            "question_id": "q-hitl",
+            "response": {"answer": "C"},
+            "behavior_signals": {"response_time_ms": 18000},
+        },
+    )
+
+    assert result["action"] == "hitl_pending"
+    assert any(msg.get("event") == "hitl_triggered" for msg in state_mgr.broadcasts)
+    assert state_mgr.supabase.audit_logs
+    assert state_mgr.supabase.audit_logs[0]["event_type"] == "hitl_trigger"

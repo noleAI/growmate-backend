@@ -110,7 +110,7 @@ class AgenticOrchestrator:
         )
 
         # 6. LLM Augmentation (nếu cần)
-        if final_action in ["hint", "de_stress", "hitl_brief"]:
+        if final_action in ["hint", "show_hint", "de_stress", "hitl_brief"]:
             llm_response = await self._call_llm_with_fallback(final_action, state)
             final_action_payload = {
                 "text": llm_response.text,
@@ -173,8 +173,74 @@ class AgenticOrchestrator:
         return False
 
     async def _trigger_hitl(self, session_id: str, state: SessionState):
-        # TODO: Push to Supabase hitl_queue + WS notify
-        pass
+        entropy = float(state.academic_state.get("entropy", 0.0))
+        fatigue = float(state.empathy_state.get("fatigue", 0.0))
+        uncertainty = float(
+            state.empathy_state.get(
+                "uncertainty", state.empathy_state.get("uncertainty_score", 0.0)
+            )
+        )
+
+        reason = "combined_uncertainty"
+        if entropy >= self.ENTROPY_THRESHOLD:
+            reason = "high_academic_entropy"
+        elif fatigue >= self.FATIGUE_THRESHOLD:
+            reason = "high_fatigue"
+        elif uncertainty > 0.9:
+            reason = "high_empathy_uncertainty"
+
+        state.strategy_state["hitl_context"] = {
+            "reason": reason,
+            "step": state.step,
+            "entropy": entropy,
+            "fatigue": fatigue,
+            "uncertainty": uncertainty,
+        }
+
+        notification = {
+            "event": "hitl_triggered",
+            "session_id": session_id,
+            "step": state.step,
+            "reason": reason,
+            "metrics": {
+                "entropy": entropy,
+                "fatigue": fatigue,
+                "uncertainty": uncertainty,
+            },
+        }
+
+        try:
+            await self.state_mgr.broadcast_ws(session_id, notification)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("HITL WS notify failed for session=%s error=%s", session_id, exc)
+
+        supabase_client = getattr(self.state_mgr, "supabase", None)
+        if supabase_client is None:
+            return
+
+        audit_payload = {
+            "session_id": session_id,
+            "event_type": "hitl_trigger",
+            "context": {
+                "reason": reason,
+                "step": state.step,
+                "entropy": entropy,
+                "fatigue": fatigue,
+                "uncertainty": uncertainty,
+            },
+            "hitl_triggered": True,
+        }
+
+        try:
+            await asyncio.to_thread(
+                lambda: supabase_client.table("audit_logs").insert(audit_payload).execute()
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "HITL audit insert failed for session=%s error=%s",
+                session_id,
+                exc,
+            )
 
     def _resolve_action(
         self,
@@ -210,12 +276,44 @@ class AgenticOrchestrator:
         fallback = self._get_fallback_template(action_type)
         return await self.llm.generate(prompt, fallback)
 
-    # TODO: Thêm _build_prompt() và _get_fallback_template() sau
     def _build_prompt(self, action_type: str, state: SessionState) -> str:
-        return ""
+        top_hypothesis = str(state.academic_state.get("top_hypothesis", ""))
+        entropy = float(state.academic_state.get("entropy", 0.0))
+        confusion = float(state.empathy_state.get("confusion", 0.0))
+        fatigue = float(state.empathy_state.get("fatigue", 0.0))
+        uncertainty = float(
+            state.empathy_state.get(
+                "uncertainty", state.empathy_state.get("uncertainty_score", 0.0)
+            )
+        )
+
+        return "\n".join(
+            [
+                "You are GrowMate tutor assistant.",
+                f"Action type: {action_type}",
+                f"Session: {state.session_id}",
+                f"Step: {state.step}",
+                "Current learner profile:",
+                f"- Top hypothesis: {top_hypothesis or 'unknown'}",
+                f"- Academic entropy: {entropy:.3f}",
+                f"- Confusion: {confusion:.3f}",
+                f"- Fatigue: {fatigue:.3f}",
+                f"- Empathy uncertainty: {uncertainty:.3f}",
+                "Generate short Vietnamese guidance that is supportive and actionable.",
+            ]
+        )
 
     def _get_fallback_template(self, action_type: str) -> str:
-        return ""
+        fallback_templates = {
+            "hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
+            "show_hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
+            "de_stress": "Ban dang co dau hieu met. Minh de xuat nghi 60 giay, uong nuoc, sau do quay lai voi 1 cau de hon.",
+            "hitl_brief": "He thong da phat hien do bat dinh cao. Se chuyen yeu cau cho nguoi huong dan ho tro tiep theo.",
+        }
+        return fallback_templates.get(
+            action_type,
+            "Hay tiep tuc voi toc do vua phai. Neu can, minh co the dua them goi y tung buoc.",
+        )
 
     def _is_pf_payload(self, payload: Dict[str, Any]) -> bool:
         required = {"confusion", "fatigue", "uncertainty", "ess", "particle_cloud", "weights"}

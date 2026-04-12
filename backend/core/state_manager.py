@@ -1,9 +1,13 @@
+import asyncio
 import json
+import logging
 from typing import Any, Dict
 
 from supabase import create_client
 
 from agents.base import SessionState
+
+logger = logging.getLogger("core.state_manager")
 
 
 class StateManager:
@@ -59,5 +63,21 @@ class StateManager:
         await self.ws.send_to_session(session_id, json.dumps(payload))
 
     async def _db_upsert(self, table: str, data: Dict[str, Any]):
-        # TODO: Implement Supabase upsert với retry
-        pass
+        retries = 2
+        for attempt in range(retries + 1):
+            try:
+                await asyncio.to_thread(
+                    lambda: self.supabase.table(table).upsert(data).execute()
+                )
+                return
+            except Exception as exc:  # noqa: BLE001
+                if attempt >= retries:
+                    logger.warning(
+                        "Supabase upsert failed table=%s session_id=%s error=%s",
+                        table,
+                        data.get("session_id", ""),
+                        exc,
+                    )
+                    return
+
+                await asyncio.sleep(min(0.1 * (2**attempt), 1.0))

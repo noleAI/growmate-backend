@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import config, inspection, orchestrator, session
-from api.ws import behavior
+from api.ws import behavior, dashboard
 from core.config import get_settings
 
 settings = get_settings()
@@ -50,6 +50,7 @@ app.include_router(
 
 # WebSockets
 app.include_router(behavior.router, prefix="/ws/v1/behavior", tags=["WebSockets"])
+app.include_router(dashboard.router, prefix="/ws/v1/dashboard", tags=["WebSockets"])
 
 
 @app.get("/health")

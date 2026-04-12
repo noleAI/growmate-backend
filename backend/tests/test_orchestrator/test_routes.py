@@ -19,7 +19,11 @@ class _OrchestratorStub:
 
 @pytest.mark.asyncio
 async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
-    monkeypatch.setattr(orchestrator_route, "get_orchestrator", lambda: _OrchestratorStub())
+    monkeypatch.setattr(
+        orchestrator_route,
+        "get_orchestrator",
+        lambda session_id=None: _OrchestratorStub(),
+    )
 
     result = await run_orchestrator_step(
         OrchestratorStepRequest(
@@ -37,7 +41,11 @@ async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_session_interact_uses_orchestrator(monkeypatch) -> None:
-    monkeypatch.setattr(session_route, "get_orchestrator", lambda: _OrchestratorStub())
+    monkeypatch.setattr(
+        session_route,
+        "get_orchestrator",
+        lambda session_id=None: _OrchestratorStub(),
+    )
 
     response = await session_route.interact(
         session_id="sess-2",
