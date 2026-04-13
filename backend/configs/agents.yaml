@@ -1,0 +1,57 @@
+# ⚠️ FILE NÀY ĐỂ TRỐNG CÁC CHI TIẾT TOÁN HỌC/QUY TẮC. 
+# Team sẽ điền sau khi xác nhận dữ liệu & chuyên gia.
+
+academic:
+  bayesian:
+    hypotheses: ["H01_Chain", "H02_ProdQuot", "H03_Trig", "H04_PowerExp", "H05_Notation", "H06_SecondDeriv", "H07_Concept", "H08_Proficient"]
+    prior_weights: {"H01_Chain": 0.22, "H02_ProdQuot": 0.18, "H03_Trig": 0.15, "H04_PowerExp": 0.12, "H05_Notation": 0.10, "H06_SecondDeriv": 0.08, "H07_Concept": 0.07, "H08_Proficient": 0.08}
+    likelihood_matrix_path: "data/derivative_priors.json"
+  htn:
+    root_task: "diagnose_derivative_concept"
+    primitive_tasks: ["P01_serve_mcq", "P02_record_response", "P03_update_beliefs", "P04_select_next_question", "P05_generate_hint", "P06_deliver_hint", "P07_start_drill", "P08_check_fatigue", "P09_trigger_de_stress", "P10_log_plan_step", "P11_backtrack_repair", "P12_trigger_hitl"]
+    decomposition_rules_path: "configs/htn_rules.yaml"
+
+empathy:
+  particle_filter:
+    n_particles: 100
+    process_noise: 0.05
+    jitter_sigma: 0.01
+    ess_threshold_ratio: 0.5
+    uncertainty_override_threshold: 0.75
+    override_action: "de_stress"
+    state_dimensions: ["confusion", "fatigue"]
+    state_bounds: {"confusion": [0.0, 1.0], "fatigue": [0.0, 1.0]}
+    q_discretization:
+      confusion_high: 0.5
+      fatigue_high: 0.6
+      fallback_state: "low_confusion_low_fatigue"
+    utility:
+      actions: ["continue_quiz", "show_hint", "suggest_break", "trigger_hitl"]
+      tie_break_priority: ["show_hint", "suggest_break", "continue_quiz", "trigger_hitl"]
+      matrix:
+        - [1.0, 0.2, -0.5, -0.8]
+        - [0.1, 0.8, 0.4, 0.3]
+        - [-0.3, 0.3, 1.0, 0.6]
+        - [-0.5, -0.2, -0.1, -0.4]
+    resampling_strategy: "systematic"  # systematic | multinomial
+    observation_noise_sigma: 0.05
+
+strategy:
+  q_learning:
+    states: ["low_confusion_low_fatigue_high_mastery", "low_confusion_low_fatigue_low_mastery", "low_confusion_high_fatigue_high_mastery", "low_confusion_high_fatigue_low_mastery", "high_confusion_low_fatigue_high_mastery", "high_confusion_low_fatigue_low_mastery", "high_confusion_high_fatigue_high_mastery", "high_confusion_high_fatigue_low_mastery"]
+    actions: ["show_hint", "drill_practice", "suggest_break", "continue_quiz", "trigger_hitl"]
+    alpha: 0.1
+    gamma: 0.9
+    epsilon_start: 0.3
+    epsilon_min: 0.05
+    q_table_seed_path: "data/q_table_seed.json"
+
+orchestrator:
+  self_monitor:
+    entropy_threshold: 0.75
+    pf_collapse_threshold: 0.15  # effective sample size / n_particles
+    q_stagnation_steps: 3
+  hitl:
+    timeout_sec: 3
+    fallback_action: "de_stress"
+    max_concurrent_queue: 5

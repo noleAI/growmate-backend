@@ -1,0 +1,43 @@
+htn_template:
+  root_task: "diagnose_derivative_mastery"
+  methods:
+    M01_standard_flow:
+      preconditions: "entropy < 0.85 AND fatigue < 0.75"
+      sequence: ["C02_assess_baseline", "C03_pinpoint_misconception", "C04_deliver_intervention", "C06_validate_improvement"]
+    M01_crisis_flow:
+      preconditions: "entropy >= 0.85 OR fatigue >= 0.75"
+      sequence: ["C05_monitor_cognitive_load", "C04_deliver_intervention", "C07_handle_execution_failure"]
+  
+  compound_tasks:
+    C02_assess_baseline:
+      methods: ["M02_quick_mcq"]
+    C03_pinpoint_misconception:
+      methods: ["M03_info_gain_drill", "M03_q_policy_drill"]
+    C04_deliver_intervention:
+      methods: ["M04_hint_first", "M04_direct_drill"]
+    C05_monitor_cognitive_load:
+      methods: ["M05_empathy_check"]
+    C06_validate_improvement:
+      methods: ["M06_post_test"]
+    C07_handle_execution_failure:
+      methods: ["M07_repair", "M07_escalate"]
+
+  primitives:
+    - id: P01_serve_mcq
+    - id: P02_record_response
+    - id: P03_update_beliefs
+    - id: P04_select_next_question
+    - id: P05_generate_hint
+    - id: P06_deliver_hint
+    - id: P07_start_drill
+    - id: P08_check_fatigue
+    - id: P09_trigger_de_stress
+    - id: P10_log_plan_step
+    - id: P11_backtrack_repair
+    - id: P12_trigger_hitl
+
+  repair_limits:
+    max_retries_per_node: 2
+    max_depth: 3
+    hitl_timeout_sec: 3
+    fallback_on_timeout: "P09_trigger_de_stress"
