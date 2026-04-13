@@ -1,0 +1,249 @@
+{
+  "version": "v1.0",
+  "deterministic": true,
+  "testCases": [
+    {
+      "caseId": "TC_NORMAL_FLOW",
+      "caseType": "normal_flow",
+      "input": {
+        "topic_code": "derivative",
+        "uncertainty": 0.22,
+        "confidence": 0.93,
+        "planAvailable": true,
+        "requestedMode": "normal"
+      },
+      "expectedDiagnosisOutput": {
+        "diagnosisId": "MATH_DERIV_DIAG_NORMAL_SUCCESS",
+        "title": "Tiến triển ổn định",
+        "gapAnalysis": "Học sinh nắm chắc phần lớn quy tắc đạo hàm và xử lý đúng ở các bước chính.",
+        "diagnosisReason": "Các lượt trả lời gần đây đúng phương pháp, độ bất định thấp, không xuất hiện mẫu lỗi khái niệm nghiêm trọng.",
+        "strengths": [
+          "Nhận diện đúng dạng bài và quy tắc đạo hàm phù hợp",
+          "Giữ được độ chính xác ở bài nhiều bước",
+          "Tự sửa được lỗi nhỏ về tính toán"
+        ],
+        "needsReview": [
+          "Ổn định ký hiệu ở bước biến đổi trung gian",
+          "Giảm sai dấu khi làm nhanh"
+        ],
+        "confidence": 0.93,
+        "riskLevel": "low",
+        "mode": "normal",
+        "requiresHITL": false,
+        "nextSuggestedTopic": "derivative",
+        "interventionPlan": [
+          "INTV_REVIEW_DERIV_RULES",
+          "INTV_PRACTICE_TIMED_DERIV"
+        ]
+      },
+      "expectedIntervention": {
+        "interventionId": "INTV_PRACTICE_TIMED_DERIV",
+        "type": "practice",
+        "title": "Luyện tập timed derivative",
+        "description": "Làm bộ câu ngắn có giới hạn thời gian để củng cố tốc độ và độ chính xác.",
+        "duration": 12,
+        "intensity": "medium",
+        "applicableRiskLevels": [
+          "low",
+          "medium"
+        ],
+        "tags": [
+          "derivative",
+          "practice",
+          "timed"
+        ]
+      },
+      "expectedSystemBehavior": {
+        "riskBandFromThresholds": "low",
+        "confidenceBandFromThresholds": "high",
+        "hitlTriggered": false,
+        "fallbackRuleApplied": null,
+        "finalMode": "normal",
+        "requiresHITL": false,
+        "decision": "continue_normal_plan"
+      }
+    },
+    {
+      "caseId": "TC_HIGH_RISK",
+      "caseType": "high_risk",
+      "input": {
+        "topic_code": "derivative",
+        "uncertainty": 0.82,
+        "confidence": 0.52,
+        "planAvailable": true,
+        "requestedMode": "hitl_pending"
+      },
+      "expectedDiagnosisOutput": {
+        "diagnosisId": "MATH_DERIV_DIAG_HITL_PENDING",
+        "title": "Cần xác nhận bởi người hướng dẫn",
+        "gapAnalysis": "Dữ liệu học tập và tín hiệu hành vi cho thấy trạng thái chưa đủ rõ để chọn can thiệp tự động an toàn.",
+        "diagnosisReason": "Độ bất định tổng hợp cao, mô hình phát hiện mâu thuẫn giữa mức hiểu bài và mức quá tải nhận thức.",
+        "strengths": [
+          "Vẫn duy trì tương tác, không bỏ phiên học",
+          "Có dấu hiệu hiểu một phần cấu trúc bài"
+        ],
+        "needsReview": [
+          "Phân biệt rõ chain rule và product rule",
+          "Ổn định tập trung ở câu nhiều biến đổi",
+          "Tăng kiểm tra lại trước khi nộp"
+        ],
+        "confidence": 0.34,
+        "riskLevel": "high",
+        "mode": "hitl_pending",
+        "requiresHITL": true,
+        "nextSuggestedTopic": "derivative",
+        "interventionPlan": [
+          "INTV_GROUNDING_54321",
+          "INTV_BREATH_BOX_60S"
+        ]
+      },
+      "expectedIntervention": {
+        "interventionId": "INTV_GROUNDING_54321",
+        "type": "grounding",
+        "title": "Grounding 5-4-3-2-1",
+        "description": "Kỹ thuật grounding nhanh để hạ overload và đưa mức tập trung về ổn định.",
+        "duration": 4,
+        "intensity": "medium",
+        "applicableRiskLevels": [
+          "medium",
+          "high"
+        ],
+        "tags": [
+          "grounding",
+          "focus",
+          "recovery"
+        ]
+      },
+      "expectedSystemBehavior": {
+        "riskBandFromThresholds": "high",
+        "confidenceBandFromThresholds": "medium",
+        "hitlTriggered": true,
+        "fallbackRuleApplied": null,
+        "finalMode": "hitl_pending",
+        "requiresHITL": true,
+        "decision": "trigger_hitl"
+      }
+    },
+    {
+      "caseId": "TC_LOW_CONFIDENCE",
+      "caseType": "low_confidence",
+      "input": {
+        "topic_code": "derivative",
+        "uncertainty": 0.55,
+        "confidence": 0.39,
+        "planAvailable": true,
+        "requestedMode": "hitl_pending"
+      },
+      "expectedDiagnosisOutput": {
+        "diagnosisId": "MATH_DERIV_DIAG_HITL_PENDING",
+        "title": "Cần xác nhận bởi người hướng dẫn",
+        "gapAnalysis": "Dữ liệu học tập và tín hiệu hành vi cho thấy trạng thái chưa đủ rõ để chọn can thiệp tự động an toàn.",
+        "diagnosisReason": "Độ bất định tổng hợp cao, mô hình phát hiện mâu thuẫn giữa mức hiểu bài và mức quá tải nhận thức.",
+        "strengths": [
+          "Vẫn duy trì tương tác, không bỏ phiên học",
+          "Có dấu hiệu hiểu một phần cấu trúc bài"
+        ],
+        "needsReview": [
+          "Phân biệt rõ chain rule và product rule",
+          "Ổn định tập trung ở câu nhiều biến đổi",
+          "Tăng kiểm tra lại trước khi nộp"
+        ],
+        "confidence": 0.34,
+        "riskLevel": "high",
+        "mode": "hitl_pending",
+        "requiresHITL": true,
+        "nextSuggestedTopic": "derivative",
+        "interventionPlan": [
+          "INTV_GROUNDING_54321",
+          "INTV_BREATH_BOX_60S"
+        ]
+      },
+      "expectedIntervention": {
+        "interventionId": "INTV_BREATH_BOX_60S",
+        "type": "breath",
+        "title": "Box breathing 60s",
+        "description": "Thực hiện nhịp thở 4-4-4-4 trong 60 giây để giảm stress tức thời.",
+        "duration": 1,
+        "intensity": "low",
+        "applicableRiskLevels": [
+          "medium",
+          "high"
+        ],
+        "tags": [
+          "breath",
+          "stress",
+          "reset"
+        ]
+      },
+      "expectedSystemBehavior": {
+        "riskBandFromThresholds": "medium",
+        "confidenceBandFromThresholds": "low",
+        "hitlTriggered": true,
+        "fallbackRuleApplied": "hitl_pending",
+        "finalMode": "hitl_pending",
+        "requiresHITL": true,
+        "decision": "trigger_hitl_by_low_confidence"
+      }
+    },
+    {
+      "caseId": "TC_FALLBACK_SCENARIO",
+      "caseType": "fallback_scenario",
+      "input": {
+        "topic_code": "derivative",
+        "uncertainty": 0.62,
+        "confidence": 0.45,
+        "planAvailable": false,
+        "requestedMode": "recovery"
+      },
+      "expectedDiagnosisOutput": {
+        "diagnosisId": "MATH_DERIV_DIAG_FALLBACK_SAFE",
+        "title": "Fallback an toàn",
+        "gapAnalysis": "Kế hoạch can thiệp chính thiếu hoặc chưa đầy đủ, hệ thống chuyển sang lộ trình an toàn để tránh gián đoạn.",
+        "diagnosisReason": "Không đủ điều kiện để thực thi plan ưu tiên, cần phương án dự phòng ổn định và có thể lặp lại.",
+        "strengths": [
+          "Có thể tiếp tục phiên học khi dùng hướng dẫn tối giản",
+          "Duy trì được mức tham gia cơ bản"
+        ],
+        "needsReview": [
+          "Củng cố lại quy tắc nền trước khi tăng độ khó",
+          "Nâng độ chắc chắn khi chuyển về luồng bình thường"
+        ],
+        "confidence": 0.45,
+        "riskLevel": "medium",
+        "mode": "recovery",
+        "requiresHITL": false,
+        "nextSuggestedTopic": "derivative",
+        "interventionPlan": [
+          "INTV_RECOVERY_LIGHT_RESTART",
+          "INTV_REVIEW_NOTATION_CHECK"
+        ]
+      },
+      "expectedIntervention": {
+        "interventionId": "INTV_RECOVERY_LIGHT_RESTART",
+        "type": "recovery",
+        "title": "Khởi động lại nhẹ",
+        "description": "Khởi động lại flow bằng câu dễ và gợi ý ngắn để tránh drop session.",
+        "duration": 6,
+        "intensity": "low",
+        "applicableRiskLevels": [
+          "medium",
+          "high"
+        ],
+        "tags": [
+          "recovery",
+          "restart",
+          "fallback"
+        ]
+      },
+      "expectedSystemBehavior": {
+        "riskBandFromThresholds": "medium",
+        "confidenceBandFromThresholds": "medium",
+        "hitlTriggered": false,
+        "fallbackRuleApplied": "missingInterventionPlan",
+        "finalMode": "recovery",
+        "requiresHITL": false,
+        "decision": "apply_fallback_safe"
+      }
+    }
+  ]
+}

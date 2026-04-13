@@ -1,0 +1,96 @@
+[
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_NORMAL_SUCCESS",
+    "title": "Tiến triển ổn định",
+    "gapAnalysis": "Học sinh nắm chắc phần lớn quy tắc đạo hàm và xử lý đúng ở các bước chính.",
+    "diagnosisReason": "Các lượt trả lời gần đây đúng phương pháp, độ bất định thấp, không xuất hiện mẫu lỗi khái niệm nghiêm trọng.",
+    "strengths": [
+      "Nhận diện đúng dạng bài và quy tắc đạo hàm phù hợp",
+      "Giữ được độ chính xác ở bài nhiều bước",
+      "Tự sửa được lỗi nhỏ về tính toán"
+    ],
+    "needsReview": [
+      "Ổn định ký hiệu ở bước biến đổi trung gian",
+      "Giảm sai dấu khi làm nhanh"
+    ],
+    "confidence": 0.93,
+    "riskLevel": "low",
+    "mode": "normal",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_REVIEW_DERIV_RULES",
+      "INTV_PRACTICE_TIMED_DERIV"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_HITL_PENDING",
+    "title": "Cần xác nhận bởi người hướng dẫn",
+    "gapAnalysis": "Dữ liệu học tập và tín hiệu hành vi cho thấy trạng thái chưa đủ rõ để chọn can thiệp tự động an toàn.",
+    "diagnosisReason": "Độ bất định tổng hợp cao, mô hình phát hiện mâu thuẫn giữa mức hiểu bài và mức quá tải nhận thức.",
+    "strengths": [
+      "Vẫn duy trì tương tác, không bỏ phiên học",
+      "Có dấu hiệu hiểu một phần cấu trúc bài"
+    ],
+    "needsReview": [
+      "Phân biệt rõ chain rule và product rule",
+      "Ổn định tập trung ở câu nhiều biến đổi",
+      "Tăng kiểm tra lại trước khi nộp"
+    ],
+    "confidence": 0.34,
+    "riskLevel": "high",
+    "mode": "hitl_pending",
+    "requiresHITL": true,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_GROUNDING_54321",
+      "INTV_BREATH_BOX_60S"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_RECOVERY_MODE",
+    "title": "Phục hồi nhịp học",
+    "gapAnalysis": "Hiệu suất giảm chủ yếu do mệt mỏi nhận thức tạm thời hơn là hổng kiến thức cốt lõi.",
+    "diagnosisReason": "Tín hiệu idle và confusion tăng theo chuỗi, phù hợp luồng recovery để giảm tải rồi quay lại bài chính.",
+    "strengths": [
+      "Hiểu nền tảng vẫn còn khi giảm tốc độ",
+      "Phản hồi tốt với hướng dẫn từng bước"
+    ],
+    "needsReview": [
+      "Khôi phục độ chính xác sau nghỉ ngắn",
+      "Tăng tự tin khi quay lại câu mức trung bình"
+    ],
+    "confidence": 0.58,
+    "riskLevel": "medium",
+    "mode": "recovery",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_RECOVERY_MICRO_BREAK",
+      "INTV_BREATH_BOX_60S"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_FALLBACK_SAFE",
+    "title": "Fallback an toàn",
+    "gapAnalysis": "Kế hoạch can thiệp chính thiếu hoặc chưa đầy đủ, hệ thống chuyển sang lộ trình an toàn để tránh gián đoạn.",
+    "diagnosisReason": "Không đủ điều kiện để thực thi plan ưu tiên, cần phương án dự phòng ổn định và có thể lặp lại.",
+    "strengths": [
+      "Có thể tiếp tục phiên học khi dùng hướng dẫn tối giản",
+      "Duy trì được mức tham gia cơ bản"
+    ],
+    "needsReview": [
+      "Củng cố lại quy tắc nền trước khi tăng độ khó",
+      "Nâng độ chắc chắn khi chuyển về luồng bình thường"
+    ],
+    "confidence": 0.45,
+    "riskLevel": "medium",
+    "mode": "recovery",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_RECOVERY_LIGHT_RESTART",
+      "INTV_REVIEW_NOTATION_CHECK"
+    ]
+  }
+]
