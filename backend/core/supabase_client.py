@@ -78,7 +78,6 @@ async def insert_learning_session(
         "student_id": student_id,
         "status": status,
     }
-    print(f"Inserting learning session with payload: {payload}")
 
     def _insert():
         return (

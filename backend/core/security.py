@@ -47,7 +47,6 @@ def get_current_user(
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         return jwt.decode(token, signing_key.key, **decode_kwargs)
     except (InvalidTokenError, PyJWKClientError) as exc:
-        print(f"Token validation error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",

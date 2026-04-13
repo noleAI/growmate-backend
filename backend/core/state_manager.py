@@ -36,7 +36,9 @@ class StateManager:
                         state.academic_state.get("belief_dist", {})
                     ),
                     "particles": json.dumps(
-                        empathy_state.get("particle_cloud", empathy_state.get("particles", []))
+                        empathy_state.get(
+                            "particle_cloud", empathy_state.get("particles", [])
+                        )
                     ),
                     "weights": json.dumps(empathy_state.get("weights", [])),
                     "ess": empathy_state.get("ess", 0.0),
@@ -54,7 +56,6 @@ class StateManager:
                     "recommended_action": empathy_state.get("recommended_action", ""),
                     "hitl_triggered": bool(empathy_state.get("hitl_triggered", False)),
                     "q_values": json.dumps(state.strategy_state.get("q_table", {})),
-                    "updated_at": "now()",
                 },
             )
             self.sync_counter[session_id] = 0

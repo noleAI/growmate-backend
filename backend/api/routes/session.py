@@ -1,3 +1,4 @@
+import copy
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -49,11 +50,11 @@ async def create_session(
                 exc,
             )
 
-    # Initialize basic state
+    # Initialize basic state with a defensive copy of mutable tracker data
     state = {
         "subject": request.subject,
         "topic": request.topic,
-        "beliefs": bayesian_tracker.beliefs,
+        "beliefs": copy.deepcopy(bayesian_tracker.beliefs),
         "student_id": student_id,
     }
     memory_store.save_session_state(session_id, state)
@@ -73,7 +74,14 @@ async def update_session(
     user: dict = current_user_dependency,
     access_token: str = Depends(get_bearer_token),
 ):
-    student_id = str(user.get("sub", ""))
+    raw_student_id = user.get("sub")
+    student_id = raw_student_id.strip() if isinstance(raw_student_id, str) else ""
+    if not student_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing student identifier",
+        )
+    
     status_value = request.status.strip().lower()
 
     if status_value not in VALID_SESSION_STATUSES:

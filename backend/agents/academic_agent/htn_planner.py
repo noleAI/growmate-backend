@@ -3,9 +3,10 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agents.base import AgentInput, AgentOutput, IAgent
+from agents.academic_agent.htn_utils import safe_eval_precondition
 
 logger = logging.getLogger("htn_planner")
 
@@ -16,7 +17,7 @@ class HTNNode(BaseModel):
     status: str = "pending"  # 'pending', 'active', 'success', 'failed'
     retry_count: int = 0
     current_method: Optional[str] = None
-    children: List["HTNNode"] = []
+    children: List["HTNNode"] = Field(default_factory=list)
 
 
 class HTNPlanner(IAgent):
@@ -102,15 +103,8 @@ class HTNPlanner(IAgent):
     def _eval_preconditions(
         self, precondition_str: str, context: Dict[str, Any]
     ) -> bool:
-        if not precondition_str:
-            return True
         try:
-            # Replace AND/OR for Python eval
-            py_cond = precondition_str.replace("AND", "and").replace("OR", "or")
-            safe_dict = {"__builtins__": {}}
-            safe_dict.update(context)
-            result = eval(py_cond, safe_dict)
-            return bool(result)
+            return safe_eval_precondition(precondition_str, context)
         except Exception as e:
             logger.error(f"Error evaluating precondition '{precondition_str}': {e}")
             return False

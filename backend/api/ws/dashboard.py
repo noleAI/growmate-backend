@@ -21,18 +21,21 @@ class DashboardConnectionManager:
             self.active_connections.pop(session_id, None)
 
     async def send_to_session(self, session_id: str, payload: str) -> None:
-        targets = list(self.active_connections.get(session_id, []))
-        targets.extend(self.active_connections.get("*", []))
+        # Build list of (origin_key, websocket) so we can remove stale sockets
+        session_targets = [ (session_id, ws) for ws in list(self.active_connections.get(session_id, [])) ]
+        global_targets = [ ("*", ws) for ws in list(self.active_connections.get("*", [])) ]
+        targets = session_targets + global_targets
 
         stale: list[tuple[str, WebSocket]] = []
-        for websocket in targets:
+        for origin_key, websocket in targets:
             try:
                 await websocket.send_text(payload)
             except Exception:  # noqa: BLE001
-                stale.append((session_id, websocket))
+                stale.append((origin_key, websocket))
 
-        for stale_session, websocket in stale:
-            self.disconnect(stale_session, websocket)
+        for origin_key, websocket in stale:
+            # Disconnect using the originating key so global subscribers are removed from the "*" list
+            self.disconnect(origin_key, websocket)
 
 
 manager = DashboardConnectionManager()

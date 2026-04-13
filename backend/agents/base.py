@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AgentInput(BaseModel):
@@ -10,14 +10,14 @@ class AgentInput(BaseModel):
     question_id: Optional[str] = None
     user_response: Optional[Dict[str, Any]] = None
     behavior_signals: Optional[Dict[str, Any]] = None
-    current_state: Dict[str, Any] = {}
+    current_state: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentOutput(BaseModel):
     action: str
-    payload: Dict[str, Any] = {}
+    payload: Dict[str, Any] = Field(default_factory=dict)
     confidence: float = 0.5
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class IAgent(ABC):
@@ -33,8 +33,8 @@ class IAgent(ABC):
 
 class SessionState(BaseModel):
     session_id: str
-    academic_state: Dict[str, Any] = {}
-    empathy_state: Dict[str, Any] = {}
-    strategy_state: Dict[str, Any] = {}
+    academic_state: Dict[str, Any] = Field(default_factory=dict)
+    empathy_state: Dict[str, Any] = Field(default_factory=dict)
+    strategy_state: Dict[str, Any] = Field(default_factory=dict)
     hitl_pending: bool = False
     step: int = 0

@@ -36,6 +36,7 @@ dev = [
     "ruff>=0.1.0",
     "supabase>=2.0.0",
     "uvicorn[standard]>=0.23.0",
+    "PyJWT[crypto]>=2.8.0,<3.0",
 ]
 
 [tool.pytest.ini_options]
