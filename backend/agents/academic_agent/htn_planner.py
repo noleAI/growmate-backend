@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from agents.base import AgentInput, AgentOutput, IAgent
 
@@ -16,7 +16,7 @@ class HTNNode(BaseModel):
     status: str = "pending"  # 'pending', 'active', 'success', 'failed'
     retry_count: int = 0
     current_method: Optional[str] = None
-    children: List["HTNNode"] = []
+    children: List["HTNNode"] = Field(default_factory=list)
 
 
 class HTNPlanner(IAgent):
