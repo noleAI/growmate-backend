@@ -1,0 +1,48 @@
+{
+	"version": "v1.0",
+	"created_at": "2026-04-13T09:00:00Z",
+	"thresholds": {
+		"riskThresholds": {
+			"low": {
+				"minUncertainty": 0.0,
+				"maxUncertainty": 0.39
+			},
+			"medium": {
+				"minUncertainty": 0.4,
+				"maxUncertainty": 0.69
+			},
+			"high": {
+				"minUncertainty": 0.7,
+				"maxUncertainty": 1.0
+			}
+		},
+		"confidenceThresholds": {
+			"low": {
+				"min": 0.0,
+				"max": 0.44
+			},
+			"medium": {
+				"min": 0.45,
+				"max": 0.79
+			},
+			"high": {
+				"min": 0.8,
+				"max": 1.0
+			}
+		}
+	},
+	"fallbackRules": {
+		"normal": "INTV_REVIEW_DERIV_RULES",
+		"recovery": "INTV_RECOVERY_LIGHT_RESTART",
+		"hitl_pending": "INTV_BREATH_BOX_60S",
+		"missingInterventionPlan": "INTV_RECOVERY_LIGHT_RESTART"
+	},
+	"hitlConditions": {
+		"mode": "hitl_pending",
+		"requiresHITL": true,
+		"uncertaintyHitlThreshold": 0.7,
+		"confidenceHitlThreshold": 0.4,
+		"idleTimeHighSeconds": 45,
+		"allowAutoRecoveryWhenHitlUnavailable": true
+	}
+}

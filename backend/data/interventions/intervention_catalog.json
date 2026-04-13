@@ -1,0 +1,123 @@
+{
+	"interventions": [
+		{
+			"interventionId": "INTV_REVIEW_DERIV_RULES",
+			"type": "review",
+			"title": "Ôn nhanh derivative rules",
+			"description": "Ôn lại các quy tắc đạo hàm cốt lõi bằng checklist ngắn để giảm lỗi thao tác.",
+			"duration": 8,
+			"intensity": "low",
+			"applicableRiskLevels": [
+				"low",
+				"medium"
+			],
+			"tags": [
+				"derivative",
+				"review",
+				"rules"
+			]
+		},
+		{
+			"interventionId": "INTV_PRACTICE_TIMED_DERIV",
+			"type": "practice",
+			"title": "Luyện tập timed derivative",
+			"description": "Làm bộ câu ngắn có giới hạn thời gian để củng cố tốc độ và độ chính xác.",
+			"duration": 12,
+			"intensity": "medium",
+			"applicableRiskLevels": [
+				"low",
+				"medium"
+			],
+			"tags": [
+				"derivative",
+				"practice",
+				"timed"
+			]
+		},
+		{
+			"interventionId": "INTV_GROUNDING_54321",
+			"type": "grounding",
+			"title": "Grounding 5-4-3-2-1",
+			"description": "Kỹ thuật grounding nhanh để hạ overload và đưa mức tập trung về ổn định.",
+			"duration": 4,
+			"intensity": "medium",
+			"applicableRiskLevels": [
+				"medium",
+				"high"
+			],
+			"tags": [
+				"grounding",
+				"focus",
+				"recovery"
+			]
+		},
+		{
+			"interventionId": "INTV_BREATH_BOX_60S",
+			"type": "breath",
+			"title": "Box breathing 60s",
+			"description": "Thực hiện nhịp thở 4-4-4-4 trong 60 giây để giảm stress tức thời.",
+			"duration": 1,
+			"intensity": "low",
+			"applicableRiskLevels": [
+				"medium",
+				"high"
+			],
+			"tags": [
+				"breath",
+				"stress",
+				"reset"
+			]
+		},
+		{
+			"interventionId": "INTV_RECOVERY_MICRO_BREAK",
+			"type": "recovery",
+			"title": "Micro break phục hồi",
+			"description": "Tạm nghỉ ngắn có hướng dẫn để phục hồi nhận thức trước khi quay lại câu hỏi.",
+			"duration": 5,
+			"intensity": "low",
+			"applicableRiskLevels": [
+				"medium",
+				"high"
+			],
+			"tags": [
+				"recovery",
+				"break",
+				"fatigue"
+			]
+		},
+		{
+			"interventionId": "INTV_RECOVERY_LIGHT_RESTART",
+			"type": "recovery",
+			"title": "Khởi động lại nhẹ",
+			"description": "Khởi động lại flow bằng câu dễ và gợi ý ngắn để tránh drop session.",
+			"duration": 6,
+			"intensity": "low",
+			"applicableRiskLevels": [
+				"medium",
+				"high"
+			],
+			"tags": [
+				"recovery",
+				"restart",
+				"fallback"
+			]
+		},
+		{
+			"interventionId": "INTV_REVIEW_NOTATION_CHECK",
+			"type": "review",
+			"title": "Kiểm tra notation",
+			"description": "Rà soát nhanh ký hiệu và dấu để giảm lỗi trình bày trong lời giải đạo hàm.",
+			"duration": 7,
+			"intensity": "low",
+			"applicableRiskLevels": [
+				"low",
+				"medium"
+			],
+			"tags": [
+				"notation",
+				"review",
+				"accuracy"
+			]
+		}
+	]
+}
