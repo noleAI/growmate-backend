@@ -12,9 +12,19 @@ _client: Optional[Client] = None
 T = TypeVar("T")
 
 
-def get_supabase_client() -> Client:
+def get_supabase_client(access_token: str | None = None) -> Client:
     # Initialize the client. In a real environment, this would handle
     # connection pooling or instantiation carefully.
+    if access_token:
+        token = access_token.strip()
+        if token.lower().startswith("bearer "):
+            token = token.split(" ", 1)[1].strip()
+
+        settings = get_settings()
+        client = create_client(settings.supabase_url, settings.supabase_key)
+        client.postgrest.auth(token)
+        return client
+
     global _client
     if _client is None:
         settings = get_settings()
@@ -61,17 +71,53 @@ async def insert_learning_session(
     session_id: str,
     student_id: str,
     status: str = "active",
+    access_token: str | None = None,
 ) -> Dict[str, Any]:
     payload = {
         "id": session_id,
         "student_id": student_id,
         "status": status,
     }
+    print(f"Inserting learning session with payload: {payload}")
 
     def _insert():
-        return get_supabase_client().table("learning_sessions").insert(payload).execute()
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .insert(payload)
+            .execute()
+        )
 
     response = await _run_with_retry("insert_learning_session", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }
+
+
+async def update_learning_session(
+    session_id: str,
+    student_id: str,
+    status: str,
+    end_time: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "status": status,
+        "end_time": end_time,
+    }
+
+    def _update():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .update(payload)
+            .eq("id", session_id)
+            .eq("student_id", student_id)
+            .execute()
+        )
+
+    response = await _run_with_retry("update_learning_session", _update)
     return {
         "data": getattr(response, "data", []),
         "count": getattr(response, "count", None),

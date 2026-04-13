@@ -2,14 +2,14 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from agents.academic_agent.bayesian_tracker import bayesian_tracker
 from agents.academic_agent.htn_planner import htn_planner
 from api.routes.orchestrator_runtime import get_orchestrator
 from core.memory_store import memory_store
-from core.security import get_current_user
-from core.supabase_client import insert_learning_session
+from core.security import get_bearer_token, get_current_user
+from core.supabase_client import insert_learning_session, update_learning_session
 from models.requests import (
     InteractionRequest,
     SessionCreateRequest,
@@ -22,19 +22,25 @@ from models.responses import InteractionResponse, SessionResponse
 router = APIRouter()
 logger = logging.getLogger("api.session")
 current_user_dependency = Depends(get_current_user)
+VALID_SESSION_STATUSES = {"active", "completed", "abandoned"}
 
 
 @router.post("", response_model=SessionResponse)
 async def create_session(
     request: SessionCreateRequest,
     user: dict = current_user_dependency,
+    access_token: str = Depends(get_bearer_token),
 ):
     session_id = str(uuid.uuid4())
     student_id = str(user.get("sub", ""))
 
     if student_id:
         try:
-            await insert_learning_session(session_id=session_id, student_id=student_id)
+            await insert_learning_session(
+                session_id=session_id,
+                student_id=student_id,
+                access_token=access_token,
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Failed to insert learning_session for session_id=%s student_id=%s: %s",
@@ -65,8 +71,61 @@ async def update_session(
     session_id: str,
     request: UpdateSessionRequest,
     user: dict = current_user_dependency,
+    access_token: str = Depends(get_bearer_token),
 ):
-    return {"status": "success", "session_id": session_id}
+    student_id = str(user.get("sub", ""))
+    status_value = request.status.strip().lower()
+
+    if status_value not in VALID_SESSION_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid session status. Allowed values: active, completed, abandoned",
+        )
+
+    end_time = (
+        datetime.now(UTC).isoformat()
+        if status_value in {"completed", "abandoned"}
+        else None
+    )
+
+    try:
+        result = await update_learning_session(
+            session_id=session_id,
+            student_id=student_id,
+            status=status_value,
+            end_time=end_time,
+            access_token=access_token,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Failed to update learning_session for session_id=%s student_id=%s: %s",
+            session_id,
+            student_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update session",
+        ) from exc
+
+    rows = result.get("data") or []
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    cached_state = memory_store.get_session_state(session_id)
+    if cached_state:
+        cached_state["session_status"] = status_value
+        cached_state["end_time"] = end_time
+        memory_store.save_session_state(session_id, cached_state)
+
+    return {
+        "status": "success",
+        "session_id": session_id,
+        "session_status": status_value,
+    }
 
 
 @router.post("/{session_id}/interact", response_model=InteractionResponse)

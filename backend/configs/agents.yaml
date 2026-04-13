@@ -8,7 +8,7 @@ academic:
     likelihood_matrix_path: "data/derivative_priors.json"
   htn:
     root_task: "diagnose_derivative_concept"
-    primitive_tasks: []  # TODO: ["ask_mcq", "ask_numerical", "give_hint", "switch_topic", ...]
+    primitive_tasks: ["P01_serve_mcq", "P02_record_response", "P03_update_beliefs", "P04_select_next_question", "P05_generate_hint", "P06_deliver_hint", "P07_start_drill", "P08_check_fatigue", "P09_trigger_de_stress", "P10_log_plan_step", "P11_backtrack_repair", "P12_trigger_hitl"]
     decomposition_rules_path: "configs/htn_rules.yaml"
 
 empathy:
@@ -38,8 +38,8 @@ empathy:
 
 strategy:
   q_learning:
-    states: []  # TODO: ["low_confusion_low_fatigue", "high_confusion_low_fatigue", ...]
-    actions: []  # TODO: ["next_question", "give_hint", "drill_practice", "de_stress", "escalate_hitl"]
+    states: ["low_confusion_low_fatigue_high_mastery", "low_confusion_low_fatigue_low_mastery", "low_confusion_high_fatigue_high_mastery", "low_confusion_high_fatigue_low_mastery", "high_confusion_low_fatigue_high_mastery", "high_confusion_low_fatigue_low_mastery", "high_confusion_high_fatigue_high_mastery", "high_confusion_high_fatigue_low_mastery"]
+    actions: ["show_hint", "drill_practice", "suggest_break", "continue_quiz", "trigger_hitl"]
     alpha: 0.1
     gamma: 0.9
     epsilon_start: 0.3
@@ -48,7 +48,7 @@ strategy:
 
 orchestrator:
   self_monitor:
-    entropy_threshold: 0.75  # TODO: điều chỉnh sau khi test prior
+    entropy_threshold: 0.75
     pf_collapse_threshold: 0.15  # effective sample size / n_particles
     q_stagnation_steps: 3
   hitl:

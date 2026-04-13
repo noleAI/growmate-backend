@@ -1,4 +1,5 @@
 import pytest
+from fastapi import HTTPException
 
 from api.routes import orchestrator as orchestrator_route
 from api.routes import session as session_route
@@ -56,3 +57,66 @@ async def test_session_interact_uses_orchestrator(monkeypatch) -> None:
     assert response.next_node_type == "show_hint"
     assert response.content == "hint text"
     assert response.belief_entropy == 0.33
+
+
+@pytest.mark.asyncio
+async def test_update_session_success(monkeypatch) -> None:
+    async def _update_learning_session_stub(**kwargs) -> dict:
+        del kwargs
+        return {
+            "data": [{"id": "sess-3", "status": "completed"}],
+            "count": 1,
+        }
+
+    monkeypatch.setattr(
+        session_route,
+        "update_learning_session",
+        _update_learning_session_stub,
+    )
+
+    result = await session_route.update_session(
+        session_id="sess-3",
+        request=session_route.UpdateSessionRequest(status="completed"),
+        user={"sub": "student-1"},
+        access_token="token",
+    )
+
+    assert result["status"] == "success"
+    assert result["session_id"] == "sess-3"
+    assert result["session_status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_update_session_rejects_invalid_status() -> None:
+    with pytest.raises(HTTPException) as exc_info:
+        await session_route.update_session(
+            session_id="sess-4",
+            request=session_route.UpdateSessionRequest(status="paused"),
+            user={"sub": "student-1"},
+            access_token="token",
+        )
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_update_session_not_found(monkeypatch) -> None:
+    async def _update_learning_session_stub(**kwargs) -> dict:
+        del kwargs
+        return {"data": [], "count": 0}
+
+    monkeypatch.setattr(
+        session_route,
+        "update_learning_session",
+        _update_learning_session_stub,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await session_route.update_session(
+            session_id="sess-5",
+            request=session_route.UpdateSessionRequest(status="active"),
+            user={"sub": "student-1"},
+            access_token="token",
+        )
+
+    assert exc_info.value.status_code == 404

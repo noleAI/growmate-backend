@@ -50,7 +50,9 @@ The orchestration layer is now split into modular components under `backend/orch
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_KEY=your-anon-key
-   SUPABASE_JWT_SECRET=your-jwt-secret
+   SUPABASE_JWT_ISSUER=https://your-project.supabase.co/auth/v1
+   SUPABASE_JWKS_URL=https://your-project.supabase.co/auth/v1/.well-known/jwks.json
+   SUPABASE_JWT_AUDIENCE=authenticated
    ENVIRONMENT=development
    ```
 
@@ -117,4 +119,4 @@ WebSocket channels:
 - `/ws/v1/dashboard/stream`: subscribe to all dashboard updates.
 - `/ws/v1/dashboard/stream/{session_id}`: subscribe to one session dashboard stream.
 
-For further implementation details regarding endpoints, please check the [API.md](./API.md) documentation in the repository.
+For further implementation details regarding endpoints, please check the [API.md](./docs/API.md) documentation in the repository.
