@@ -8,4 +8,5 @@ redis>=5.0.0
 httpx>=0.24.0
 numpy>=1.24.0
 pyyaml>=6.0
+google-cloud-aiplatform>=1.95.1
 PyJWT[crypto]>=2.8.0,<3.0
