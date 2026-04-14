@@ -4,8 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import config, inspection, orchestrator, session
+from api.routes.orchestrator_runtime import set_shared_data_packages
 from api.ws import behavior, dashboard
 from core.config import get_settings
+from core.data_packages import DataPackagesService
 
 settings = get_settings()
 
@@ -14,6 +16,14 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     # Startup: Initialize connections (Supabase, Redis if applicable)
     print(f"Starting GrowMate Backend in {settings.environment} mode.")
+    data_packages_service = DataPackagesService.from_default_paths()
+    if not data_packages_service.load():
+        raise RuntimeError(
+            "Data package validation failed at startup. "
+            "Please fix Package 2/3/4 files before launching the API."
+        )
+    app.state.data_packages_service = data_packages_service
+    set_shared_data_packages(data_packages_service)
     yield
     # Shutdown: Clean up connections
     print("Shutting down GrowMate Backend.")
