@@ -23,8 +23,7 @@ def _resolve_supabase_jwks_url(settings: Settings) -> str:
         return settings.supabase_jwks_url
     return f"{_resolve_supabase_issuer(settings)}/.well-known/jwks.json"
 
-
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=1)
 def _get_jwks_client(jwks_url: str) -> PyJWKClient:
     return PyJWKClient(jwks_url)
 
