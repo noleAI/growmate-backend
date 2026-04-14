@@ -8,6 +8,7 @@ import yaml
 
 from agents.base import AgentInput, AgentOutput, IAgent, SessionState
 from agents.empathy_agent.particle_filter import ParticleFilter
+from core.data_packages import DataPackagesService
 from core.llm_service import LLMService
 from core.payload_formatter import format_dashboard_payload
 from core.state_manager import StateManager
@@ -42,6 +43,10 @@ class AgenticOrchestrator:
             pf_config.get("uncertainty_override_threshold", 0.75)
         )
         self.pf_agent = ParticleFilter(config=pf_config)
+
+        # Data-driven bundles (Package 2/3/4). If invalid, runtime falls back to legacy behavior.
+        self.data_packages = DataPackagesService.from_default_paths()
+        self.data_packages.load()
 
     async def run_session_step(
         self, session_id: str, payload: Dict[str, Any]
@@ -119,6 +124,15 @@ class AgenticOrchestrator:
         else:
             final_action_payload = {}
 
+        data_driven_payload = self._build_data_driven_payload(
+            state=state,
+            decision=orchestrator_decision,
+            final_action=final_action,
+        )
+        if data_driven_payload:
+            final_action_payload["data_driven"] = data_driven_payload
+            state.strategy_state["data_driven"] = data_driven_payload
+
         # 7. Format & Broadcast
         dashboard_payload = format_dashboard_payload(
             state,
@@ -126,6 +140,8 @@ class AgenticOrchestrator:
             final_action_payload,
             orchestrator_decision=orchestrator_decision.model_dump(),
         )
+        if data_driven_payload:
+            dashboard_payload["data_driven"] = data_driven_payload
         await self.state_mgr.broadcast_ws(session_id, dashboard_payload)
 
         # 8. Async Sync & Return
@@ -135,9 +151,107 @@ class AgenticOrchestrator:
         return {
             "action": final_action,
             "payload": final_action_payload,
+            "data_driven": data_driven_payload,
             "dashboard_update": dashboard_payload,
             "latency_ms": latency_ms,
         }
+
+    def _build_data_driven_payload(
+        self,
+        state: SessionState,
+        decision: OrchestratorDecision,
+        final_action: str,
+    ) -> Optional[Dict[str, Any]]:
+        if not self.data_packages.is_ready():
+            return None
+
+        academic_state = state.academic_state
+        empathy_state = state.empathy_state
+
+        entropy = float(academic_state.get("entropy", 0.0))
+        confidence = float(academic_state.get("confidence", max(0.0, min(1.0, 1.0 - entropy))))
+        uncertainty = float(decision.total_uncertainty)
+
+        risk_band = self.data_packages.get_risk_band(uncertainty)
+        confidence_band = self.data_packages.get_confidence_band(confidence)
+        hitl_by_threshold = self.data_packages.should_trigger_hitl(uncertainty, confidence)
+
+        mode = self._resolve_data_mode(
+            final_action=final_action,
+            hitl_by_threshold=hitl_by_threshold,
+            hitl_pending=state.hitl_pending,
+            fatigue=float(empathy_state.get("fatigue", 0.0)),
+        )
+
+        diagnosis = self.data_packages.resolve_diagnosis(
+            mode=mode,
+            risk_level=risk_band,
+        )
+
+        fallback_rule_applied: Optional[str] = None
+        if diagnosis is None:
+            diagnosis = self.data_packages.resolve_diagnosis(
+                mode="recovery",
+                risk_level="medium",
+                prefer_fallback_safe=True,
+            )
+            fallback_rule_applied = "missingDiagnosisScenario"
+
+        intervention_plan = []
+        if diagnosis:
+            raw_plan = diagnosis.get("interventionPlan", [])
+            if isinstance(raw_plan, list):
+                intervention_plan = [str(item) for item in raw_plan]
+
+        interventions = self.data_packages.resolve_interventions(intervention_plan)
+        if not interventions:
+            fallback_id = self.data_packages.get_fallback_intervention_id(
+                mode=mode,
+                missing_plan=True,
+            )
+            if fallback_id:
+                interventions = self.data_packages.resolve_interventions([fallback_id])
+                fallback_rule_applied = "missingInterventionPlan"
+
+        selected_intervention = interventions[0] if interventions else None
+
+        final_mode = str(diagnosis.get("mode", mode)) if diagnosis else mode
+        requires_hitl = (
+            bool(diagnosis.get("requiresHITL", False))
+            if diagnosis
+            else bool(final_mode == "hitl_pending")
+        )
+
+        system_behavior = {
+            "riskBandFromThresholds": risk_band,
+            "confidenceBandFromThresholds": confidence_band,
+            "hitlTriggered": bool(hitl_by_threshold or state.hitl_pending),
+            "fallbackRuleApplied": fallback_rule_applied,
+            "finalMode": final_mode,
+            "requiresHITL": requires_hitl,
+        }
+
+        return {
+            "diagnosis": diagnosis,
+            "interventions": interventions,
+            "selectedIntervention": selected_intervention,
+            "systemBehavior": system_behavior,
+        }
+
+    def _resolve_data_mode(
+        self,
+        final_action: str,
+        hitl_by_threshold: bool,
+        hitl_pending: bool,
+        fatigue: float,
+    ) -> str:
+        if hitl_pending or final_action in {"hitl", "hitl_pending"} or hitl_by_threshold:
+            return "hitl_pending"
+
+        if final_action in {"de_stress", "suggest_break"} or fatigue >= self.FATIGUE_THRESHOLD:
+            return "recovery"
+
+        return "normal"
 
     async def _check_self_monitor(
         self,
