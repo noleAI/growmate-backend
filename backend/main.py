@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import config, inspection, orchestrator, session
+from api.routes.orchestrator_runtime import set_shared_data_packages
 from api.ws import behavior, dashboard
 from core.config import get_settings
 from core.data_packages import DataPackagesService
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
             "Please fix Package 2/3/4 files before launching the API."
         )
     app.state.data_packages_service = data_packages_service
+    set_shared_data_packages(data_packages_service)
     yield
     # Shutdown: Clean up connections
     print("Shutting down GrowMate Backend.")

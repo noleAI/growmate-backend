@@ -110,6 +110,90 @@ def test_data_packages_service_rejects_unknown_intervention_reference(
     assert service.is_ready() is False
 
 
+def test_data_packages_service_tolerates_non_dict_diagnosis_items(
+    tmp_path: Path,
+) -> None:
+    """Non-dict items in the diagnosis array must not raise AttributeError."""
+    diagnosis_path = tmp_path / "diagnosis.json"
+    interventions_path = tmp_path / "interventions.json"
+    runtime_path = tmp_path / "runtime.json"
+
+    # Mix a valid dict scenario with a plain string (non-dict) to trigger the guard.
+    diagnosis_payload = [
+        "not-a-dict",
+        {
+            "diagnosisId": "DIAG_GOOD",
+            "title": "ok",
+            "gapAnalysis": "ok",
+            "diagnosisReason": "ok",
+            "strengths": ["s"],
+            "needsReview": ["n"],
+            "confidence": 0.8,
+            "riskLevel": "low",
+            "mode": "normal",
+            "requiresHITL": False,
+            "nextSuggestedTopic": "topic",
+            "interventionPlan": ["INTV_A"],
+        },
+    ]
+
+    interventions_payload = {
+        "interventions": [
+            {
+                "interventionId": "INTV_A",
+                "type": "review",
+                "title": "a",
+                "description": "a",
+                "duration": 5,
+                "intensity": "low",
+                "applicableRiskLevels": ["low"],
+                "tags": [],
+            }
+        ]
+    }
+
+    runtime_payload = {
+        "version": "v1",
+        "created_at": "2026-04-14T00:00:00Z",
+        "thresholds": {
+            "riskThresholds": {
+                "low": {"minUncertainty": 0.0, "maxUncertainty": 0.39},
+                "medium": {"minUncertainty": 0.4, "maxUncertainty": 0.69},
+                "high": {"minUncertainty": 0.7, "maxUncertainty": 1.0},
+            },
+            "confidenceThresholds": {
+                "low": {"min": 0.0, "max": 0.44},
+                "medium": {"min": 0.45, "max": 0.79},
+                "high": {"min": 0.8, "max": 1.0},
+            },
+        },
+        "fallbackRules": {
+            "normal": "INTV_A",
+            "recovery": "INTV_A",
+            "hitl_pending": "INTV_A",
+            "missingInterventionPlan": "INTV_A",
+        },
+        "hitlConditions": {
+            "uncertaintyHitlThreshold": 0.7,
+            "confidenceHitlThreshold": 0.4,
+        },
+    }
+
+    _write_json(diagnosis_path, diagnosis_payload)
+    _write_json(interventions_path, interventions_payload)
+    _write_json(runtime_path, runtime_payload)
+
+    service = DataPackagesService(
+        diagnosis_path=diagnosis_path,
+        intervention_path=interventions_path,
+        runtime_config_path=runtime_path,
+    )
+
+    # Validation should flag the non-dict item but NOT raise AttributeError.
+    assert service.load() is False
+    assert service.is_ready() is False
+
+
 def test_data_packages_service_resolves_diagnosis_and_interventions() -> None:
     service = DataPackagesService.from_default_paths()
     assert service.load() is True

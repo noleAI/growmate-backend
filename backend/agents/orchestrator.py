@@ -20,7 +20,11 @@ logger = logging.getLogger("orchestrator")
 
 class AgenticOrchestrator:
     def __init__(
-        self, agents: Dict[str, IAgent], state_mgr: StateManager, llm: LLMService
+        self,
+        agents: Dict[str, IAgent],
+        state_mgr: StateManager,
+        llm: LLMService,
+        data_packages: Optional[DataPackagesService] = None,
     ):
         self.agents = agents
         self.state_mgr = state_mgr
@@ -36,7 +40,7 @@ class AgenticOrchestrator:
         self.PF_COLLAPSE_THRESHOLD = float(
             self.self_monitor_cfg.get("pf_collapse_threshold", 0.15)
         )
-        self.MAX_HTL_RETRIES = 3
+        self.MAX_HITL_RETRIES = 3
 
         pf_config = self.config.get("empathy", {}).get("particle_filter", {})
         self.empathy_override_threshold = float(
@@ -44,9 +48,14 @@ class AgenticOrchestrator:
         )
         self.pf_agent = ParticleFilter(config=pf_config)
 
-        # Data-driven bundles (Package 2/3/4). If invalid, runtime falls back to legacy behavior.
-        self.data_packages = DataPackagesService.from_default_paths()
-        self.data_packages.load()
+        # Data-driven bundles (Package 2/3/4). Accept an already-loaded shared instance when
+        # available (e.g. injected from startup); otherwise create and load a private one so
+        # the orchestrator degrades gracefully when running outside the full app context.
+        if data_packages is not None:
+            self.data_packages = data_packages
+        else:
+            self.data_packages = DataPackagesService.from_default_paths()
+            self.data_packages.load()
 
     async def run_session_step(
         self, session_id: str, payload: Dict[str, Any]

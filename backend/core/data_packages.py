@@ -314,6 +314,8 @@ class DataPackagesService:
                 )
 
         for item in diagnosis:
+            if not isinstance(item, dict):
+                continue
             for intervention_id in item.get("interventionPlan", []):
                 if intervention_id not in intervention_ids:
                     issues.append(

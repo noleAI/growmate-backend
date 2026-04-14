@@ -14,6 +14,7 @@ from agents.orchestrator import AgenticOrchestrator
 from agents.strategy_agent.q_learning import QLearningAgent
 from api.ws.dashboard import manager as dashboard_ws_manager
 from core.config import get_settings
+from core.data_packages import DataPackagesService
 from core.llm_service import LLMService
 from core.state_manager import StateManager
 
@@ -25,6 +26,9 @@ _ORCHESTRATOR_MAX_SESSIONS_DEFAULT = 1024
 _orchestrators_by_session: OrderedDict[str, AgenticOrchestrator] = OrderedDict()
 _shared_state_manager: Optional[StateManager] = None
 _shared_llm: Optional[LLMService] = None
+# Single DataPackagesService instance shared across all orchestrators.  Set at app startup via
+# set_shared_data_packages(); falls back to lazy load if called outside the full app context.
+_shared_data_packages: Optional[DataPackagesService] = None
 
 # Cache loaded agents config to avoid repeated IO
 _agents_config_cache: Optional[Dict[str, Any]] = None
@@ -120,6 +124,21 @@ def _build_shared_dependencies() -> tuple[StateManager, LLMService]:
     return _shared_state_manager, _shared_llm
 
 
+def set_shared_data_packages(service: DataPackagesService) -> None:
+    """Register the app-startup-validated DataPackagesService so all orchestrators share it."""
+    global _shared_data_packages
+    _shared_data_packages = service
+
+
+def _get_shared_data_packages() -> DataPackagesService:
+    """Return the shared DataPackagesService, creating one lazily if not yet set."""
+    global _shared_data_packages
+    if _shared_data_packages is None:
+        _shared_data_packages = DataPackagesService.from_default_paths()
+        _shared_data_packages.load()
+    return _shared_data_packages
+
+
 def _build_session_agents() -> dict[str, IAgent]:
     cfg = _load_agents_config()
 
@@ -152,6 +171,7 @@ def get_orchestrator(session_id: Optional[str] = None) -> AgenticOrchestrator:
         agents=_build_session_agents(),
         state_mgr=state_mgr,
         llm=llm,
+        data_packages=_get_shared_data_packages(),
     )
     _orchestrators_by_session[session_key] = orchestrator
     return orchestrator
