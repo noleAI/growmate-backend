@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import numpy as np
@@ -297,3 +298,34 @@ async def test_orchestrator_hitl_emits_ws_and_audit_log() -> None:
     assert any(msg.get("event") == "hitl_triggered" for msg in state_mgr.broadcasts)
     assert state_mgr.supabase.audit_logs
     assert state_mgr.supabase.audit_logs[0]["event_type"] == "hitl_trigger"
+
+
+def test_detect_spam_with_fast_low_accuracy_signals(pf: ParticleFilter) -> None:
+    signals = [
+        {"response_time_ms": 1200, "is_correct": False},
+        {"response_time_ms": 1500, "is_correct": False},
+        {"response_time_ms": 1600, "is_correct": False},
+    ]
+    assert pf.detect_spam(signals) is True
+
+
+def test_detect_afk_after_threshold(pf: ParticleFilter) -> None:
+    last_signal_time = (datetime.now(timezone.utc) - timedelta(seconds=220)).isoformat()
+    assert pf.detect_afk(last_signal_time) is True
+
+
+@pytest.mark.asyncio
+async def test_process_sets_pause_flags_when_spam_detected(pf: ParticleFilter) -> None:
+    output = await pf.process(
+        AgentInput(
+            session_id="sess-spam",
+            behavior_signals={"response_time_ms": 1100, "is_correct": False},
+            signal_history=[
+                {"response_time_ms": 1200, "is_correct": False},
+                {"response_time_ms": 1300, "is_correct": False},
+            ],
+        )
+    )
+
+    assert output.payload["spam_detected"] is True
+    assert output.payload["pause_recommended"] is True

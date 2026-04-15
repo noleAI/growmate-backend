@@ -8,8 +8,12 @@ from models.requests import InteractionRequest
 
 
 class _OrchestratorStub:
+    def __init__(self) -> None:
+        self.last_payload: dict | None = None
+
     async def run_session_step(self, session_id: str, payload: dict) -> dict:
-        del session_id, payload
+        del session_id
+        self.last_payload = payload
         return {
             "action": "show_hint",
             "payload": {"text": "hint text"},
@@ -20,10 +24,11 @@ class _OrchestratorStub:
 
 @pytest.mark.asyncio
 async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
+    stub = _OrchestratorStub()
     monkeypatch.setattr(
         orchestrator_route,
         "get_orchestrator",
-        lambda session_id=None: _OrchestratorStub(),
+        lambda session_id=None: stub,
     )
 
     result = await run_orchestrator_step(
@@ -38,6 +43,35 @@ async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
 
     assert result["status"] == "ok"
     assert result["result"]["action"] == "show_hint"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_route_forwards_xp_and_mode(monkeypatch) -> None:
+    stub = _OrchestratorStub()
+    monkeypatch.setattr(
+        orchestrator_route,
+        "get_orchestrator",
+        lambda session_id=None: stub,
+    )
+
+    result = await run_orchestrator_step(
+        OrchestratorStepRequest(
+            session_id="sess-1b",
+            question_id="q2",
+            response={"answer": "B"},
+            behavior_signals={"response_time_ms": 6100},
+            xp_data={"recent_xp_gain": 80, "streak_days": 3},
+            mode="explore",
+            classification_level="advanced",
+        ),
+        user={"sub": "student-2"},
+    )
+
+    assert result["status"] == "ok"
+    assert stub.last_payload is not None
+    assert stub.last_payload["xp_data"] == {"recent_xp_gain": 80, "streak_days": 3}
+    assert stub.last_payload["mode"] == "explore"
+    assert stub.last_payload["classification_level"] == "advanced"
 
 
 @pytest.mark.asyncio

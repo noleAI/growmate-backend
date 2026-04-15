@@ -156,8 +156,6 @@ class HTNPlanner(IAgent):
             "P07_start_drill": "start_drill",
             "P08_check_fatigue": "check_fatigue",
             "P09_trigger_de_stress": "trigger_de_stress",
-            "P10_log_plan_step": "log_plan_step",
-            "P11_backtrack_repair": "backtrack_repair",
             "P12_trigger_hitl": "trigger_hitl",
         }
         mapped_action = mapping.get(task_id, task_id)

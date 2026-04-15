@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
@@ -100,7 +101,56 @@ class ParticleFilter(IAgent):
 
     async def process(self, input_data: AgentInput) -> AgentOutput:
         start_time = time.perf_counter()
-        signals = input_data.behavior_signals or {}
+        raw_signals = input_data.behavior_signals or {}
+        if not isinstance(raw_signals, dict):
+            raw_signals = {}
+
+        analytics_signals = self._derive_signals_from_analytics(input_data.analytics_data)
+        signals = self._blend_signals(raw_signals, analytics_signals)
+
+        signal_history = list(input_data.signal_history or [])
+        if raw_signals:
+            signal_history.append(dict(raw_signals))
+        signal_history = signal_history[-5:]
+
+        spam_detected = self.detect_spam(signal_history)
+        afk_detected = self.detect_afk(input_data.last_signal_time)
+
+        if spam_detected or afk_detected:
+            state = self.get_state()
+            confidence = float(np.clip(1.0 - state.uncertainty, 0.0, 1.0))
+            belief_distribution = self._compute_state_belief(state)
+            eu_values, recommended_action = self._compute_eu_values(belief_distribution)
+
+            payload = state.model_dump()
+            payload.update(
+                {
+                    "q_state": self.discretize_for_q(state),
+                    "resample_triggered": False,
+                    "step": self.step,
+                    "belief_distribution": belief_distribution,
+                    "particle_distribution": self._particle_distribution_histogram(),
+                    "eu_values": eu_values,
+                    "recommended_action": recommended_action,
+                    "hitl_triggered": False,
+                    "override_recommended_action": "de_stress",
+                    "spam_detected": spam_detected,
+                    "afk_detected": afk_detected,
+                    "pause_recommended": True,
+                }
+            )
+
+            return AgentOutput(
+                action="empathy_tracked",
+                payload=payload,
+                confidence=confidence,
+                metadata={
+                    "latency_ms": int((time.perf_counter() - start_time) * 1000),
+                    "spam_detected": spam_detected,
+                    "afk_detected": afk_detected,
+                    "analytics_signals_used": bool(analytics_signals),
+                },
+            )
 
         self.predict()
         self.update(signals, self.likelihood_fn)
@@ -140,6 +190,9 @@ class ParticleFilter(IAgent):
                 "override_recommended_action": self.override_action
                 if hitl_triggered
                 else None,
+                "spam_detected": False,
+                "afk_detected": False,
+                "pause_recommended": False,
             }
         )
 
@@ -147,8 +200,155 @@ class ParticleFilter(IAgent):
             action="empathy_tracked",
             payload=payload,
             confidence=confidence,
-            metadata={"latency_ms": latency_ms},
+            metadata={
+                "latency_ms": latency_ms,
+                "analytics_signals_used": bool(analytics_signals),
+            },
         )
+
+    def _derive_signals_from_analytics(
+        self, analytics_data: Optional[Dict[str, Any]]
+    ) -> Dict[str, float]:
+        if not isinstance(analytics_data, dict):
+            return {}
+
+        derived: Dict[str, float] = {}
+
+        accuracy = self._extract_rate(
+            analytics_data,
+            ["accuracy_rate", "accuracy", "session_accuracy"],
+        )
+        if accuracy is not None:
+            derived["error_rate"] = float(np.clip(1.0 - accuracy, 0.0, 1.0))
+
+        correction_rate = self._extract_rate(
+            analytics_data,
+            ["correction_rate", "self_correction_rate"],
+        )
+        if correction_rate is not None:
+            derived["correction_rate"] = correction_rate
+
+        engagement = self._extract_rate(
+            analytics_data,
+            ["engagement_score", "engagement", "engagement_index"],
+        )
+        if engagement is not None:
+            derived["confidence_slider"] = engagement
+            derived["idle_time_ratio"] = float(np.clip(1.0 - engagement, 0.0, 1.0))
+
+        idle_ratio = self._extract_rate(
+            analytics_data,
+            ["idle_time_ratio", "inactivity_ratio"],
+        )
+        if idle_ratio is not None:
+            existing_idle = derived.get("idle_time_ratio", 0.0)
+            derived["idle_time_ratio"] = max(existing_idle, idle_ratio)
+
+        session_minutes = self._extract_float(
+            analytics_data,
+            ["session_time_minutes", "session_duration_minutes", "session_minutes"],
+        )
+        if session_minutes is not None:
+            fatigue_proxy = float(np.clip(session_minutes / 90.0, 0.0, 1.0))
+            existing_idle = derived.get("idle_time_ratio", 0.0)
+            derived["idle_time_ratio"] = max(existing_idle, fatigue_proxy)
+
+        return derived
+
+    def _blend_signals(
+        self,
+        behavior_signals: Dict[str, Any],
+        analytics_signals: Dict[str, float],
+    ) -> Dict[str, float]:
+        merged: Dict[str, float] = {}
+
+        for key, value in behavior_signals.items():
+            numeric = self._extract_float({key: value}, [key])
+            if numeric is not None:
+                merged[key] = numeric
+
+        for key, value in analytics_signals.items():
+            if key in merged:
+                merged[key] = float(np.clip(0.7 * merged[key] + 0.3 * value, 0.0, 1.0))
+            else:
+                merged[key] = value
+
+        return merged
+
+    def _extract_float(
+        self,
+        data: Dict[str, Any],
+        keys: List[str],
+    ) -> Optional[float]:
+        for key in keys:
+            if key not in data:
+                continue
+            try:
+                value = float(data[key])
+            except (TypeError, ValueError):
+                continue
+            if np.isfinite(value):
+                return value
+        return None
+
+    def _extract_rate(
+        self,
+        data: Dict[str, Any],
+        keys: List[str],
+    ) -> Optional[float]:
+        value = self._extract_float(data, keys)
+        if value is None:
+            return None
+        if value > 1.0:
+            value = value / 100.0
+        return float(np.clip(value, 0.0, 1.0))
+
+    def detect_spam(self, signals: List[Dict[str, Any]]) -> bool:
+        if not signals:
+            return False
+
+        consecutive_fast = 0
+        max_consecutive_fast = 0
+        correctness_samples: List[float] = []
+
+        for signal in signals[-5:]:
+            response_time_ms = float(signal.get("response_time_ms", 10000))
+            if response_time_ms < 2000:
+                consecutive_fast += 1
+                max_consecutive_fast = max(max_consecutive_fast, consecutive_fast)
+            else:
+                consecutive_fast = 0
+
+            if "is_correct" in signal:
+                correctness_samples.append(1.0 if bool(signal.get("is_correct")) else 0.0)
+            elif "correct" in signal:
+                correctness_samples.append(1.0 if bool(signal.get("correct")) else 0.0)
+
+        if max_consecutive_fast < 3:
+            return False
+
+        if not correctness_samples:
+            return True
+
+        accuracy = sum(correctness_samples) / len(correctness_samples)
+        return accuracy < 0.2
+
+    def detect_afk(self, last_signal_time: Optional[str]) -> bool:
+        if not last_signal_time:
+            return False
+
+        try:
+            if isinstance(last_signal_time, str):
+                parsed = datetime.fromisoformat(last_signal_time.replace("Z", "+00:00"))
+            else:
+                return False
+        except ValueError:
+            return False
+
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+
+        return (datetime.now(timezone.utc) - parsed).total_seconds() > 180
 
     def predict(self) -> None:
         """State transition with process noise for confusion and fatigue."""

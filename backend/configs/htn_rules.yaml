@@ -32,8 +32,6 @@ htn_template:
     - id: P07_start_drill
     - id: P08_check_fatigue
     - id: P09_trigger_de_stress
-    - id: P10_log_plan_step
-    - id: P11_backtrack_repair
     - id: P12_trigger_hitl
 
   repair_limits:

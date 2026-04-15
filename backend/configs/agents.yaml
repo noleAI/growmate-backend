@@ -3,12 +3,12 @@
 
 academic:
   bayesian:
-    hypotheses: ["H01_Chain", "H02_ProdQuot", "H03_Trig", "H04_PowerExp", "H05_Notation", "H06_SecondDeriv", "H07_Concept", "H08_Proficient"]
-    prior_weights: {"H01_Chain": 0.22, "H02_ProdQuot": 0.18, "H03_Trig": 0.15, "H04_PowerExp": 0.12, "H05_Notation": 0.10, "H06_SecondDeriv": 0.08, "H07_Concept": 0.07, "H08_Proficient": 0.08}
+    hypotheses: ["H01_Trig", "H02_ExpLog", "H03_Chain", "H04_Rules"]
+    prior_weights: {"H01_Trig": 0.25, "H02_ExpLog": 0.25, "H03_Chain": 0.25, "H04_Rules": 0.25}
     likelihood_matrix_path: "data/derivative_priors.json"
   htn:
     root_task: "diagnose_derivative_concept"
-    primitive_tasks: ["P01_serve_mcq", "P02_record_response", "P03_update_beliefs", "P04_select_next_question", "P05_generate_hint", "P06_deliver_hint", "P07_start_drill", "P08_check_fatigue", "P09_trigger_de_stress", "P10_log_plan_step", "P11_backtrack_repair", "P12_trigger_hitl"]
+    primitive_tasks: ["P01_serve_mcq", "P02_record_response", "P03_update_beliefs", "P04_select_next_question", "P05_generate_hint", "P06_deliver_hint", "P07_start_drill", "P08_check_fatigue", "P09_trigger_de_stress", "P12_trigger_hitl"]
     decomposition_rules_path: "configs/htn_rules.yaml"
 
 empathy:

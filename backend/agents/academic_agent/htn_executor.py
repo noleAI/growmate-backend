@@ -1,7 +1,7 @@
 """
 HTN Executor: Primitive task dispatch registry.
 
-Maps primitive task IDs (P01–P12) to async handler functions.
+Maps primitive task IDs (P01–P09, P12) to async handler functions.
 Provides execute_primitive() as the single dispatch entry point.
 """
 
@@ -63,14 +63,6 @@ async def _trigger_de_stress(ctx: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": "success", "payload": {"pause_active": True}}
 
 
-async def _log_plan_step(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    return {"status": "success", "payload": {"log_id": "log_001"}}
-
-
-async def _backtrack_repair(ctx: Dict[str, Any]) -> Dict[str, Any]:
-    return {"status": "success", "payload": {"repaired": True}}
-
-
 async def _trigger_hitl(ctx: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": "success", "payload": {"hitl_status": "pending"}}
 
@@ -89,8 +81,6 @@ PRIMITIVE_REGISTRY: Dict[str, PrimitiveHandler] = {
     "P07_start_drill": _start_drill,
     "P08_check_fatigue": _check_fatigue,
     "P09_trigger_de_stress": _trigger_de_stress,
-    "P10_log_plan_step": _log_plan_step,
-    "P11_backtrack_repair": _backtrack_repair,
     "P12_trigger_hitl": _trigger_hitl,
 }
 

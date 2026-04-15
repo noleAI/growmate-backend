@@ -11,6 +11,7 @@ from api.routes.orchestrator_runtime import get_orchestrator
 from core.memory_store import memory_store
 from core.security import get_bearer_token, get_current_user
 from core.supabase_client import insert_learning_session, update_learning_session
+from core.user_classifier import classify
 from models.requests import (
     InteractionRequest,
     SessionCreateRequest,
@@ -51,11 +52,21 @@ async def create_session(
             )
 
     # Initialize basic state with a defensive copy of mutable tracker data
+    classification_level = request.classification_level
+    if not classification_level and isinstance(request.onboarding_results, dict):
+        classification_level = classify(request.onboarding_results).value
+    if not classification_level:
+        classification_level = "intermediate"
+
+    mode = request.mode or "normal"
+
     state = {
         "subject": request.subject,
         "topic": request.topic,
         "beliefs": copy.deepcopy(bayesian_tracker.beliefs),
         "student_id": student_id,
+        "classification_level": classification_level,
+        "mode": mode,
     }
     memory_store.save_session_state(session_id, state)
 
@@ -152,6 +163,13 @@ async def interact(
         "question_id": request.quiz_id or request.action_type,
         "response": response_data,
         "behavior_signals": behavior_signals,
+        "xp_data": request.xp_data,
+        "mode": request.mode,
+        "classification_level": request.classification_level,
+        "onboarding_results": request.onboarding_results,
+        "analytics_data": request.analytics_data,
+        "is_off_topic": request.is_off_topic,
+        "resume": request.resume,
         "student_id": str(user.get("sub", "")),
     }
 
@@ -173,6 +191,7 @@ async def interact(
             content=content,
             plan_repaired=repaired,
             belief_entropy=entropy,
+            data_driven=result.get("data_driven"),
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning(

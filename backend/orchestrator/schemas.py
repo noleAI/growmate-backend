@@ -37,3 +37,13 @@ class OrchestratorDecision(BaseModel):
     hitl_payload: Optional[Dict[str, Any]] = None
     rationale: str = ""
     monitoring: Dict[str, float] = Field(default_factory=dict)
+
+
+class FormulaRecommendation(BaseModel):
+    formulaId: str
+    title: str
+    formula: str
+    hypothesis: str
+    belief: float
+    relevanceScore: float
+    reason: str
