@@ -40,7 +40,7 @@ async def test_f02_crisis_mode_and_cognitive_load():
     with patch(
         "agents.academic_agent.htn_executor.PRIMITIVE_REGISTRY", new_callable=dict
     ) as mock_reg:
-        mock_reg["P08_assess_fatigue"] = AsyncMock(
+        mock_reg["P08_check_fatigue"] = AsyncMock(
             return_value={"status": "success", "payload": {"fatigue": 0.82}}
         )
         mock_p09 = AsyncMock(

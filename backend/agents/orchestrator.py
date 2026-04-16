@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -9,13 +10,17 @@ import yaml
 from agents.base import AgentInput, AgentOutput, IAgent, SessionState
 from agents.empathy_agent.particle_filter import ParticleFilter
 from core.data_packages import DataPackagesService
+from core.formula_recommender import FormulaRecommender
 from core.llm_service import LLMService
 from core.payload_formatter import format_dashboard_payload
 from core.state_manager import StateManager
+from core.supabase_client import increment_user_token_usage
+from core.user_classifier import classify
 from orchestrator.engine import OrchestratorEngine
 from orchestrator.schemas import OrchestratorDecision
 
 logger = logging.getLogger("orchestrator")
+VN_TZ = timezone(timedelta(hours=7))
 
 
 class AgenticOrchestrator:
@@ -57,6 +62,8 @@ class AgenticOrchestrator:
             self.data_packages = DataPackagesService.from_default_paths()
             self.data_packages.load()
 
+        self.formula_recommender = FormulaRecommender()
+
     async def run_session_step(
         self, session_id: str, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -64,6 +71,79 @@ class AgenticOrchestrator:
         start_time = time.time()
         state = await self.state_mgr.load_or_init(session_id)
         student_id = payload.get("student_id")
+        access_token_raw = payload.get("access_token")
+        access_token = access_token_raw if isinstance(access_token_raw, str) else None
+
+        register_context = getattr(self.state_mgr, "register_session_context", None)
+        if callable(register_context):
+            register_context(
+                session_id=session_id,
+                student_id=student_id,
+                access_token=access_token,
+            )
+
+        mode = str(payload.get("mode") or state.mode or state.strategy_state.get("mode", "normal"))
+        classification_level = payload.get("classification_level")
+        onboarding_results = payload.get("onboarding_results")
+        if not classification_level and isinstance(onboarding_results, dict):
+            classification_level = classify(onboarding_results).value
+        if not classification_level:
+            classification_level = state.user_classification_level or state.strategy_state.get(
+                "classification_level", "intermediate"
+            )
+        classification_level = str(classification_level)
+
+        state.mode = mode
+        state.user_classification_level = classification_level
+        state.strategy_state["mode"] = mode
+        state.strategy_state["classification_level"] = classification_level
+        state.strategy_state["student_id"] = str(student_id or "").strip()
+
+        if bool(payload.get("resume", False)):
+            state.pause_state = False
+            state.pause_reason = None
+            state.pause_timestamp = None
+
+        if bool(payload.get("is_off_topic", False)):
+            state.off_topic_counter += 1
+        state.strategy_state["off_topic_counter"] = state.off_topic_counter
+
+        behavior_signals = payload.get("behavior_signals")
+        if not isinstance(behavior_signals, dict):
+            behavior_signals = {}
+
+        previous_signal_time = state.last_signal_time
+        if behavior_signals:
+            signal_entry = dict(behavior_signals)
+            signal_entry["timestamp"] = datetime.now(UTC).isoformat()
+            history = list(state.signal_history or [])
+            history.append(signal_entry)
+            state.signal_history = history[-5:]
+            state.last_signal_time = signal_entry["timestamp"]
+
+        state.last_interaction_timestamp = datetime.now(UTC)
+        state.strategy_state["last_interaction_at"] = (
+            state.last_interaction_timestamp.isoformat()
+        )
+
+        academic_agent = self.agents.get("academic")
+        apply_profile_prior = getattr(academic_agent, "apply_profile_prior", None)
+        if callable(apply_profile_prior) and state.step == 0:
+            try:
+                profile_beliefs = apply_profile_prior(classification_level)
+                if isinstance(profile_beliefs, dict):
+                    state.academic_state["belief_dist"] = profile_beliefs
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Failed to apply profile prior for session=%s level=%s error=%s",
+                    session_id,
+                    classification_level,
+                    exc,
+                )
+
+        xp_data = payload.get("xp_data")
+        if isinstance(xp_data, dict):
+            state.strategy_state["xp_data"] = xp_data
 
         # 1. Chuẩn bị input chung
         agent_input = AgentInput(
@@ -71,12 +151,39 @@ class AgenticOrchestrator:
             student_id=student_id,
             question_id=payload.get("question_id"),
             user_response=payload.get("response"),
-            behavior_signals=payload.get("behavior_signals"),
+            behavior_signals=behavior_signals,
+            mode=mode,
+            classification_level=classification_level,
+            signal_history=list(state.signal_history or []),
+            last_signal_time=previous_signal_time,
+            analytics_data=payload.get("analytics_data"),
+            off_topic_counter=state.off_topic_counter,
             current_state=state.model_dump(),
         )
 
         # 2. Chạy Agent Pipeline
         academic_out = await self.agents["academic"].process(agent_input)
+
+        error_chain = payload.get("error_chain")
+        if error_chain is None and isinstance(payload.get("response"), dict):
+            error_chain = payload["response"].get("error_chain")
+        if isinstance(error_chain, list):
+            update_from_error_chain = getattr(self.agents["academic"], "update_from_error_chain", None)
+            if callable(update_from_error_chain):
+                try:
+                    updated_beliefs = update_from_error_chain(error_chain)
+                    if isinstance(updated_beliefs, dict):
+                        academic_out.payload["belief_dist"] = updated_beliefs
+                        get_entropy = getattr(self.agents["academic"], "get_entropy", None)
+                        if callable(get_entropy):
+                            academic_out.payload["entropy"] = float(get_entropy())
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "Error-chain update failed for session=%s error=%s",
+                        session_id,
+                        exc,
+                    )
+
         empathy_out = await self.agents["empathy"].process(agent_input)
 
         if not self._is_pf_payload(empathy_out.payload):
@@ -91,6 +198,13 @@ class AgenticOrchestrator:
         state.academic_state.update(academic_out.payload)
         state.empathy_state.update(empathy_out.payload)
 
+        spam_detected = bool(state.empathy_state.get("spam_detected", False))
+        afk_detected = bool(state.empathy_state.get("afk_detected", False))
+        if spam_detected or afk_detected:
+            state.pause_state = True
+            state.pause_reason = "spam" if spam_detected else "afk"
+            state.pause_timestamp = datetime.now(UTC).isoformat()
+
         strategy_input = agent_input.model_copy(update={"current_state": state.model_dump()})
         strategy_out = await self.agents["strategy"].process(strategy_input)
         state.strategy_state.update(strategy_out.payload)
@@ -100,6 +214,26 @@ class AgenticOrchestrator:
             state.strategy_state["q_state"] = q_state
 
         state.step += 1
+        total_questions = int(state.strategy_state.get("total_questions", 10) or 10)
+        if total_questions <= 0:
+            total_questions = 10
+        state.strategy_state["total_questions"] = total_questions
+        state.strategy_state["last_question_index"] = min(
+            total_questions,
+            max(0, int(state.step or 0)),
+        )
+        state.strategy_state["progress_percent"] = min(
+            100,
+            int(
+                round(
+                    (
+                        state.strategy_state["last_question_index"]
+                        / max(1, total_questions)
+                    )
+                    * 100
+                )
+            ),
+        )
 
         orchestrator_decision = self.decision_engine.run_step(
             academic_state=state.academic_state,
@@ -114,18 +248,45 @@ class AgenticOrchestrator:
             state.hitl_pending = True
             await self._trigger_hitl(session_id, state)
 
-        # 5. Select Final Action (ưu tiên: HITL > Strategy > Academic Fallback)
-        final_action = self._resolve_action(
-            academic_out,
-            empathy_out,
-            strategy_out,
-            state.hitl_pending,
-            orchestrator_decision,
-        )
+        # 5. Select Final Action with pause and off-topic safeguards.
+        if state.off_topic_counter >= 3:
+            final_action = "gentle_redirect"
+            state.off_topic_counter = 0
+            state.strategy_state["off_topic_counter"] = 0
+        elif state.pause_state:
+            final_action = "pause_quiz"
+        else:
+            final_action = self._resolve_action(
+                academic_out,
+                empathy_out,
+                strategy_out,
+                state.hitl_pending,
+                orchestrator_decision,
+            )
 
         # 6. LLM Augmentation (nếu cần)
-        if final_action in ["hint", "show_hint", "de_stress", "hitl_brief"]:
-            llm_response = await self._call_llm_with_fallback(final_action, state)
+        if final_action == "pause_quiz":
+            reason = state.pause_reason or "manual"
+            final_action_payload = {
+                "reason": reason,
+                "text": (
+                    "Phiên học đã tạm dừng do phát hiện thao tác bất thường."
+                    if reason == "spam"
+                    else "Bạn đã tạm nghỉ quá lâu. Bấm tiếp tục khi sẵn sàng học lại."
+                ),
+            }
+        elif final_action == "gentle_redirect":
+            final_action_payload = {
+                "reason": "off_topic",
+                "text": "Mình sẽ đưa cuộc trò chuyện quay lại bài học đạo hàm để học hiệu quả hơn.",
+            }
+        elif final_action in ["hint", "show_hint", "de_stress", "hitl_brief"]:
+            llm_response = await self._call_llm_with_fallback(
+                final_action,
+                state,
+                student_id=student_id,
+                access_token=access_token,
+            )
             final_action_payload = {
                 "text": llm_response.text,
                 "fallback_used": llm_response.fallback_used,
@@ -224,6 +385,15 @@ class AgenticOrchestrator:
 
         selected_intervention = interventions[0] if interventions else None
 
+        belief_dist = academic_state.get("belief_dist")
+        if not isinstance(belief_dist, dict):
+            belief_dist = academic_state.get("belief_distribution", {})
+        formula_recommendations = self.formula_recommender.recommend_formulas(
+            belief_dist=belief_dist if isinstance(belief_dist, dict) else {},
+            threshold=0.3,
+            limit=3,
+        )
+
         final_mode = str(diagnosis.get("mode", mode)) if diagnosis else mode
         requires_hitl = (
             bool(diagnosis.get("requiresHITL", False))
@@ -244,6 +414,7 @@ class AgenticOrchestrator:
             "diagnosis": diagnosis,
             "interventions": interventions,
             "selectedIntervention": selected_intervention,
+            "formulaRecommendations": formula_recommendations,
             "systemBehavior": system_behavior,
         }
 
@@ -394,10 +565,59 @@ class AgenticOrchestrator:
 
         return strategy.action if strategy.action else academic.action
 
-    async def _call_llm_with_fallback(self, action_type: str, state: SessionState):
+    async def _call_llm_with_fallback(
+        self,
+        action_type: str,
+        state: SessionState,
+        student_id: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ):
         prompt = self._build_prompt(action_type, state)
         fallback = self._get_fallback_template(action_type)
-        return await self.llm.generate(prompt, fallback)
+        response = await self.llm.generate(prompt, fallback)
+        await self._track_llm_usage(
+            student_id=student_id,
+            session_id=state.session_id,
+            response_text=response.text,
+            access_token=access_token,
+        )
+        return response
+
+    async def _track_llm_usage(
+        self,
+        student_id: Optional[str],
+        session_id: str,
+        response_text: str,
+        access_token: Optional[str],
+    ) -> None:
+        user_id = str(student_id or "").strip()
+        if not user_id:
+            return
+
+        tokens_used = self._estimate_tokens(response_text)
+        usage_date = datetime.now(VN_TZ).date()
+
+        try:
+            await increment_user_token_usage(
+                user_id=user_id,
+                tokens_used=tokens_used,
+                usage_date=usage_date,
+                access_token=access_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to increment token usage for user=%s session=%s: %s",
+                user_id,
+                session_id,
+                exc,
+            )
+
+    def _estimate_tokens(self, text: str) -> int:
+        cleaned = text.strip()
+        if not cleaned:
+            return 0
+        # Use a simple approximation when provider token metadata is unavailable.
+        return max(1, len(cleaned) // 4)
 
     def _build_prompt(self, action_type: str, state: SessionState) -> str:
         top_hypothesis = str(state.academic_state.get("top_hypothesis", ""))
@@ -428,14 +648,14 @@ class AgenticOrchestrator:
 
     def _get_fallback_template(self, action_type: str) -> str:
         fallback_templates = {
-            "hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
-            "show_hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
-            "de_stress": "Ban dang co dau hieu met. Minh de xuat nghi 60 giay, uong nuoc, sau do quay lai voi 1 cau de hon.",
-            "hitl_brief": "He thong da phat hien do bat dinh cao. Se chuyen yeu cau cho nguoi huong dan ho tro tiep theo.",
+            "hint": "Thử nhỏ bài toán thành từng bước nhỏ. Hãy bắt đầu bằng việc xác định quy tắc đạo hàm phù hợp.",
+            "show_hint": "Thử nhỏ bài toán thành từng bước nhỏ. Hãy bắt đầu bằng việc xác định quy tắc đạo hàm phù hợp.",
+            "de_stress": "Bạn đang có dấu hiệu mệt. Mình đề xuất nghỉ 60 giây, uống nước, sau đó quay lại với 1 câu dễ hơn.",
+            "hitl_brief": "Hệ thống đã phát hiện độ bất định cao. Sẽ chuyển yêu cầu cho người hướng dẫn hỗ trợ tiếp theo.",
         }
         return fallback_templates.get(
             action_type,
-            "Hay tiep tuc voi toc do vua phai. Neu can, minh co the dua them goi y tung buoc.",
+            "Hãy tiếp tục với tốc độ vừa phải. Nếu cần, mình có thể đưa thêm gợi ý từng bước.",
         )
 
     def _is_pf_payload(self, payload: Dict[str, Any]) -> bool:

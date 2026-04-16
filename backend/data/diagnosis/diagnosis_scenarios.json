@@ -92,5 +92,101 @@
       "INTV_RECOVERY_LIGHT_RESTART",
       "INTV_REVIEW_NOTATION_CHECK"
     ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_H01_TRIG_WEAK",
+    "title": "Hổng kiến thức đạo hàm lượng giác",
+    "gapAnalysis": "Học sinh thường nhầm dấu và nhầm công thức khi đổi giữa sin, cos, tan.",
+    "diagnosisReason": "Chuỗi đáp án sai tập trung ở các câu trigonometry và derivative_values, trong khi nhóm quy tắc đại số vẫn ổn định.",
+    "strengths": [
+      "Giữ được tiến độ làm bài, không bỏ câu",
+      "Hiểu khái niệm đạo hàm cơ bản ngoài lượng giác"
+    ],
+    "needsReview": [
+      "Cặp công thức (sin x)' và (cos x)'",
+      "Đạo hàm tan x và điều kiện xác định",
+      "Rèn kiểm tra dấu âm trước khi nộp"
+    ],
+    "confidence": 0.72,
+    "riskLevel": "medium",
+    "mode": "normal",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_REVIEW_DERIV_RULES",
+      "INTV_REVIEW_NOTATION_CHECK"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_H02_EXPLOG_WEAK",
+    "title": "Yếu ở mũ và logarit",
+    "gapAnalysis": "Học sinh hay quên hệ số ln(a) hoặc nhầm công thức của ln(u).",
+    "diagnosisReason": "Lỗi lặp lại ở nhóm exponential_function và logarithm, đặc biệt tại bài có chain rule lồng trong hàm mũ/log.",
+    "strengths": [
+      "Thực hiện tốt phép biến đổi đại số cơ bản",
+      "Đọc đề đúng và xác định được biến số chính"
+    ],
+    "needsReview": [
+      "(a^x)' = a^x ln(a)",
+      "(ln u)' = u'/u",
+      "Soát lại hệ số sau khi áp dụng chain rule"
+    ],
+    "confidence": 0.7,
+    "riskLevel": "medium",
+    "mode": "normal",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_REVIEW_DERIV_RULES",
+      "INTV_PRACTICE_TIMED_DERIV"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_H03_CHAIN_WEAK",
+    "title": "Yếu ở quy tắc chain rule",
+    "gapAnalysis": "Học sinh nhận dạng được hàm ngoài nhưng thường bỏ sót đạo hàm của hàm trong.",
+    "diagnosisReason": "Phân tích lỗi cho thấy nhiều đáp án thiếu hệ số từ u'(x) ở bài hàm hợp nhiều lớp.",
+    "strengths": [
+      "Nắm được quy tắc lũy thừa cơ bản",
+      "Có thể hoàn thành bài dạng một bước"
+    ],
+    "needsReview": [
+      "Mẫu f(g(x)) và thứ tự lấy đạo hàm",
+      "Bài tập hàm hợp với sin, exp, ln",
+      "Thói quen viết rõ u, u' trước khi thế"
+    ],
+    "confidence": 0.69,
+    "riskLevel": "medium",
+    "mode": "normal",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_REVIEW_NOTATION_CHECK",
+      "INTV_PRACTICE_TIMED_DERIV"
+    ]
+  },
+  {
+    "diagnosisId": "MATH_DERIV_DIAG_H04_RULES_WEAK",
+    "title": "Yếu ở quy tắc tổng quát",
+    "gapAnalysis": "Học sinh còn lẫn lộn product rule và quotient rule trong bài nhiều bước.",
+    "diagnosisReason": "Lỗi xuất hiện dày ở các câu rules, quotient_rule và bài vận dụng có phân thức.",
+    "strengths": [
+      "Có thể làm đúng các câu nhận biết đơn giản",
+      "Duy trì thời gian làm bài tương đối ổn định"
+    ],
+    "needsReview": [
+      "(uv)' và (u/v)'",
+      "Kiểm tra mẫu số bình phương ở quotient rule",
+      "Rà dấu trước khi rút gọn"
+    ],
+    "confidence": 0.71,
+    "riskLevel": "medium",
+    "mode": "normal",
+    "requiresHITL": false,
+    "nextSuggestedTopic": "derivative",
+    "interventionPlan": [
+      "INTV_REVIEW_DERIV_RULES",
+      "INTV_REVIEW_NOTATION_CHECK"
+    ]
   }
 ]

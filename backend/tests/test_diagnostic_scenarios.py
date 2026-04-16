@@ -10,7 +10,7 @@ def tracker():
 
 def test_chain_rule_diagnosis(tracker):
     """Mô phỏng học sinh sai chain rule liên tục"""
-    if "H01_Chain" not in tracker.beliefs:
+    if "H03_Chain" not in tracker.beliefs:
         pytest.skip("Config not matching test expectations")
 
     # use a specific wrong evidence that signals chain-rule issues
@@ -20,29 +20,27 @@ def test_chain_rule_diagnosis(tracker):
     belief = tracker.beliefs
     top_hypothesis = max(belief, key=belief.get)
 
-    # Assuming H01_Chain is a likely cause for E_WRONG_ANSWER
-    assert top_hypothesis == "H01_Chain" or belief.get("H01_Chain", 0) > belief.get(
-        "H08_Proficient", 0
-    )
+    assert top_hypothesis == "H03_Chain"
 
 
 def test_proficient_student(tracker):
     """Mô phỏng học sinh giỏi"""
-    if "H08_Proficient" not in tracker.beliefs:
+    if "H01_Trig" not in tracker.beliefs:
         pytest.skip("Config not matching test expectations")
+
+    initial_entropy = tracker.get_entropy()
 
     for _ in range(3):
         tracker.update_evidence("answer_pattern", "E_CORRECT")
 
     belief = tracker.beliefs
-    # Expect the proficient hypothesis to increase substantially
-    assert belief["H08_Proficient"] > 0.5
-    assert tracker.get_entropy() < 1.0
+    assert max(belief.values()) > 0.3
+    assert tracker.get_entropy() < initial_entropy
 
 
 def test_noisy_student(tracker):
     """Mô phỏng học sinh lúc đúng lúc sai (Nhiễu)"""
-    if "H01_Chain" not in tracker.beliefs:
+    if "H03_Chain" not in tracker.beliefs:
         pytest.skip("Config not matching test expectations")
 
     tracker.update_evidence("answer_pattern", "E_WRONG_OPERATOR")
@@ -58,7 +56,7 @@ def test_noisy_student(tracker):
 
 def test_granular_evidence_discrimination(tracker):
     """Test khả năng phân biệt lỗi chi tiết"""
-    if "H01_Chain" not in tracker.beliefs:
+    if "H03_Chain" not in tracker.beliefs:
         pytest.skip("Config not matching test expectations")
 
     tracker.update_evidence("answer_pattern", "E_MISSING_INNER")
@@ -69,7 +67,5 @@ def test_granular_evidence_discrimination(tracker):
     tracker.update_evidence("answer_pattern", "E_WRONG_SIGN")
     belief_2 = tracker.beliefs.copy()
 
-    assert belief_1.get("H01_Chain", 0) > belief_2.get("H01_Chain", 0)
-    assert belief_2.get("H05_Notation", 0) > belief_1.get(
-        "H05_Notation", 0
-    ) or belief_2.get("H03_Trig", 0) > belief_1.get("H03_Trig", 0)
+    assert belief_1.get("H03_Chain", 0) > belief_2.get("H03_Chain", 0)
+    assert belief_2.get("H04_Rules", 0) > belief_1.get("H04_Rules", 0)

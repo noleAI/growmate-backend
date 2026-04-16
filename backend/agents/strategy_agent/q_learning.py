@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -93,14 +94,23 @@ class QLearningAgent(IAgent):
         state = input_data.current_state or {}
         empathy_state = state.get("empathy_state", {})
         academic_state = state.get("academic_state", {})
+        strategy_state = state.get("strategy_state", {})
+        mode = str(input_data.mode or strategy_state.get("mode") or state.get("mode") or "normal")
         signals = input_data.behavior_signals or {}
 
         mastery_level = self._resolve_mastery_level(academic_state)
         q_state = str(empathy_state.get("q_state", "low_confusion_low_fatigue"))
         state_key = f"{q_state}_{mastery_level}"
 
-        action, explored = self.select_action(state_key)
-        reward = compute_reward(signals, academic_state, empathy_state)
+        action, explored = self.select_action(state_key, mode=mode)
+        xp_data = state.get("xp_data") or strategy_state.get("xp_data")
+        reward = compute_reward(
+            signals,
+            academic_state,
+            empathy_state,
+            xp_data=xp_data,
+            mode=mode,
+        )
 
         next_mastery = str(academic_state.get("next_mastery", mastery_level))
         next_q_state = str(empathy_state.get("next_q_state", q_state))
@@ -164,14 +174,16 @@ class QLearningAgent(IAgent):
             "avg_reward_10": avg_reward_10,
             "delta_q": self.delta_q_log[-1] if self.delta_q_log else {},
             "epsilon": float(self.epsilon),
+            "mode": mode,
             "state_key": state_key,
             "next_state_key": next_state_key,
             "reward": float(reward),
         }
 
         logger.info(
-            "[strategy] step=%s epsilon=%.3f action=%s reward=%.2f",
+            "[strategy] step=%s mode=%s epsilon=%.3f action=%s reward=%.2f",
             self.step,
+            mode,
             self.epsilon,
             selected_action,
             reward,
@@ -189,13 +201,34 @@ class QLearningAgent(IAgent):
             return 0
         return self.state_to_idx[state_key]
 
-    def select_action(self, state_key: str) -> Tuple[str, bool]:
+    def select_action(self, state_key: str, mode: str = "normal") -> Tuple[str, bool]:
         """Select action using epsilon-greedy policy."""
         state_idx = self._get_state_idx(state_key)
-        if float(np.random.random()) < self.epsilon:
+        mode_normalized = str(mode).lower()
+
+        effective_epsilon = self.epsilon
+        if mode_normalized == "exam_prep":
+            effective_epsilon = max(self.min_epsilon, self.epsilon * 0.5)
+        elif mode_normalized == "explore":
+            effective_epsilon = min(0.9, self.epsilon * 1.2)
+
+        if float(np.random.random()) < effective_epsilon:
             action_idx = int(np.random.randint(self.n_actions))
             return self.actions[action_idx], True
-        return self.actions[int(np.argmax(self.Q[state_idx]))], False
+
+        adjusted_q = self.Q[state_idx].copy()
+        if mode_normalized == "exam_prep":
+            if "show_hint" in self.actions:
+                adjusted_q[self.actions.index("show_hint")] -= 0.15
+            if "drill_practice" in self.actions:
+                adjusted_q[self.actions.index("drill_practice")] += 0.1
+        elif mode_normalized == "explore":
+            if "show_hint" in self.actions:
+                adjusted_q[self.actions.index("show_hint")] += 0.15
+            if "continue_quiz" in self.actions:
+                adjusted_q[self.actions.index("continue_quiz")] -= 0.05
+
+        return self.actions[int(np.argmax(adjusted_q))], False
 
     def update(
         self, state_key: str, action: str, reward: float, next_state_key: str
@@ -259,8 +292,28 @@ class QLearningAgent(IAgent):
         if mastery in {"high_mastery", "low_mastery"}:
             return mastery
 
-        proficient_prob = float(academic_state.get("belief_dist", {}).get("H08_Proficient", 0.0))
-        return "high_mastery" if proficient_prob >= 0.5 else "low_mastery"
+        entropy = academic_state.get("entropy")
+        if entropy is None:
+            belief_dist = academic_state.get("belief_dist") or academic_state.get(
+                "belief_distribution", {}
+            )
+            if isinstance(belief_dist, dict) and belief_dist:
+                probabilities = [
+                    float(max(0.0, value))
+                    for value in belief_dist.values()
+                    if value is not None
+                ]
+                total = sum(probabilities)
+                if total > 0.0:
+                    normalized = [p / total for p in probabilities if p > 0.0]
+                    if len(normalized) > 1:
+                        raw_entropy = -sum(p * math.log(p) for p in normalized)
+                        entropy = raw_entropy / math.log(len(normalized))
+                    else:
+                        entropy = 0.0
+
+        normalized_entropy = float(entropy) if entropy is not None else 1.0
+        return "high_mastery" if normalized_entropy < 0.35 else "low_mastery"
 
     def _bootstrap_expert_init(self, expert_init: List[List[Any]]) -> None:
         for row in expert_init:

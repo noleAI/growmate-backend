@@ -1,6 +1,24 @@
 from typing import Any, Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class FormulaRecommendationResponse(BaseModel):
+    formulaId: str
+    title: str
+    formula: str
+    hypothesis: str
+    belief: float
+    relevanceScore: float
+    reason: str
+
+
+class DataDrivenResponse(BaseModel):
+    diagnosis: Dict[str, Any]
+    interventions: List[Dict[str, Any]]
+    selectedIntervention: Dict[str, Any] | None = None
+    formulaRecommendations: List[FormulaRecommendationResponse] = Field(default_factory=list)
+    systemBehavior: Dict[str, Any]
 
 
 class SessionResponse(BaseModel):
@@ -15,6 +33,7 @@ class InteractionResponse(BaseModel):
     content: str
     plan_repaired: bool
     belief_entropy: float
+    data_driven: DataDrivenResponse | None = None
 
 
 class ConfigResponse(BaseModel):

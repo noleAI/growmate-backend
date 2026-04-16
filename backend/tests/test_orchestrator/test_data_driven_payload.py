@@ -32,6 +32,28 @@ class _AcademicAgent(IAgent):
         )
 
 
+class _WeakAcademicAgent(IAgent):
+    @property
+    def name(self) -> str:
+        return "academic"
+
+    async def process(self, input_data: AgentInput) -> AgentOutput:
+        del input_data
+        return AgentOutput(
+            action="academic_ok",
+            payload={
+                "entropy": 0.6,
+                "confidence": 0.4,
+                "belief_dist": {
+                    "H01_Trig": 0.12,
+                    "H02_ExpLog": 0.18,
+                    "H03_Chain": 0.52,
+                    "H04_Rules": 0.18,
+                },
+            },
+        )
+
+
 class _EmpathyAgent(IAgent):
     @property
     def name(self) -> str:
@@ -107,6 +129,8 @@ async def test_orchestrator_emits_data_driven_payload() -> None:
     assert result["data_driven"]["diagnosis"]["diagnosisId"] == "MATH_DERIV_DIAG_NORMAL_SUCCESS"
     assert result["data_driven"]["systemBehavior"]["riskBandFromThresholds"] == "low"
     assert result["data_driven"]["selectedIntervention"]["interventionId"] == "INTV_REVIEW_DERIV_RULES"
+    assert "formulaRecommendations" in result["data_driven"]
+    assert isinstance(result["data_driven"]["formulaRecommendations"], list)
     assert "data_driven" in result["dashboard_update"]
 
 
@@ -151,3 +175,30 @@ async def test_orchestrator_applies_missing_plan_fallback(monkeypatch) -> None:
     assert data_driven is not None
     assert data_driven["systemBehavior"]["fallbackRuleApplied"] == "missingInterventionPlan"
     assert data_driven["selectedIntervention"]["interventionId"] == "INTV_RECOVERY_LIGHT_RESTART"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_recommends_formulas_when_belief_is_low() -> None:
+    state_mgr = _StateManagerStub()
+    orchestrator = AgenticOrchestrator(
+        agents={
+            "academic": _WeakAcademicAgent(),
+            "empathy": _EmpathyAgent(),
+            "strategy": _StrategyAgent(),
+        },
+        state_mgr=state_mgr,
+        llm=_DummyLLM(),
+    )
+
+    result = await orchestrator.run_session_step(
+        session_id="sess-formula-rec",
+        payload={
+            "question_id": "q-3",
+            "response": {"answer": "C"},
+            "behavior_signals": {"response_time_ms": 8500},
+        },
+    )
+
+    recommendations = result["data_driven"]["formulaRecommendations"]
+    assert recommendations
+    assert recommendations[0]["hypothesis"] in {"H01_Trig", "H02_ExpLog", "H04_Rules"}

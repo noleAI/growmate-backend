@@ -17,15 +17,22 @@ def test_normalization(tracker):
 
 
 def test_single_update_logic(tracker):
-    """Kiểm tra logic cập nhật cơ bản cho H08 (Proficient) khi trả lời đúng"""
-    # Assuming config is loaded properly
-    initial_h08 = tracker.beliefs.get("H08_Proficient", 0.0)
-    # use the correct-answer evidence key defined in derivative_priors.json
-    tracker.update_evidence("answer_pattern", "E_CORRECT")
-    final_belief = tracker.beliefs
+    """Kiểm tra cập nhật khi trả lời đúng làm belief hội tụ trên 4 hypotheses."""
+    initial_entropy = tracker.get_entropy()
 
-    if "H08_Proficient" in final_belief:
-        assert final_belief["H08_Proficient"] > initial_h08
+    tracker.update_evidence("answer_pattern", "E_CORRECT")
+    tracker.update_evidence("answer_pattern", "E_CORRECT")
+    tracker.update_evidence("answer_pattern", "E_CORRECT")
+
+    final_belief = tracker.beliefs
+    assert len(final_belief) == 4
+    assert set(final_belief.keys()) == {
+        "H01_Trig",
+        "H02_ExpLog",
+        "H03_Chain",
+        "H04_Rules",
+    }
+    assert tracker.get_entropy() < initial_entropy
 
 
 def test_edge_case_zero_division():

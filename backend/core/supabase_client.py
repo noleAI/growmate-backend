@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 from supabase import Client, create_client
@@ -123,6 +123,177 @@ async def update_learning_session(
     }
 
 
+async def update_learning_session_progress(
+    session_id: str,
+    student_id: str,
+    last_question_index: int,
+    total_questions: int,
+    progress_percent: int,
+    last_interaction_at: datetime | str | None,
+    state_snapshot: Dict[str, Any] | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    safe_total_questions = max(1, int(total_questions or 1))
+    safe_last_question_index = max(0, int(last_question_index or 0))
+    safe_progress_percent = max(0, min(100, int(progress_percent or 0)))
+    if safe_last_question_index > safe_total_questions:
+        safe_last_question_index = safe_total_questions
+
+    interaction_dt = _parse_optional_datetime(last_interaction_at)
+    payload = {
+        "last_question_index": safe_last_question_index,
+        "total_questions": safe_total_questions,
+        "progress_percent": safe_progress_percent,
+        "last_interaction_at": (
+            interaction_dt.astimezone(UTC).isoformat() if interaction_dt else None
+        ),
+        "state_snapshot": state_snapshot if isinstance(state_snapshot, dict) else {},
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+
+    def _update():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .update(payload)
+            .eq("id", session_id)
+            .eq("student_id", student_id)
+            .execute()
+        )
+
+    response = await _run_with_retry("update_learning_session_progress", _update)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }
+
+
+async def get_latest_active_learning_session(
+    student_id: str,
+    access_token: str | None = None,
+) -> Dict[str, Any] | None:
+    def _select_full():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select(
+                "id,student_id,start_time,end_time,status,last_question_index,total_questions,progress_percent,last_interaction_at,state_snapshot"
+            )
+            .eq("student_id", student_id)
+            .eq("status", "active")
+            .order("last_interaction_at", desc=True)
+            .order("start_time", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    def _select_basic():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select("id,student_id,start_time,end_time,status")
+            .eq("student_id", student_id)
+            .eq("status", "active")
+            .order("start_time", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        response = await _run_with_retry(
+            "get_latest_active_learning_session",
+            _select_full,
+        )
+    except Exception:
+        response = await _run_with_retry(
+            "get_latest_active_learning_session_basic",
+            _select_basic,
+        )
+
+    rows = getattr(response, "data", []) or []
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return None
+
+
+async def list_learning_session_ids(
+    student_id: str,
+    limit: int = 30,
+    access_token: str | None = None,
+) -> list[str]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select("id")
+            .eq("student_id", student_id)
+            .limit(max(1, int(limit)))
+            .execute()
+        )
+
+    response = await _run_with_retry("list_learning_session_ids", _select)
+    rows = getattr(response, "data", []) or []
+
+    result: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        session_id = str(row.get("id", "")).strip()
+        if session_id:
+            result.append(session_id)
+
+    return result
+
+
+async def count_daily_learning_sessions(
+    student_id: str,
+    usage_date: date,
+    access_token: str | None = None,
+) -> int:
+    day_start = datetime.combine(usage_date, datetime.min.time(), tzinfo=UTC)
+    next_day = day_start + timedelta(days=1)
+
+    def _count():
+        return (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select("id", count="exact")
+            .eq("student_id", student_id)
+            .gte("start_time", day_start.isoformat())
+            .lt("start_time", next_day.isoformat())
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("count_daily_learning_sessions", _count)
+    count = getattr(response, "count", None)
+    return int(count or 0)
+
+
+async def list_agent_state_rows(
+    session_ids: list[str],
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    normalized_ids = [str(value).strip() for value in session_ids if str(value).strip()]
+    if not normalized_ids:
+        return []
+
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("agent_state")
+            .select("session_id,belief_dist,updated_at")
+            .in_("session_id", normalized_ids)
+            .limit(max(1, len(normalized_ids) * 3))
+            .execute()
+        )
+
+    response = await _run_with_retry("list_agent_state_rows", _select, timeout_sec=5.0)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
 async def insert_episodic_memory(
     student_id: str,
     session_id: str,
@@ -178,4 +349,492 @@ async def upsert_q_table_entry(
     return {
         "data": getattr(response, "data", []),
         "count": getattr(response, "count", None),
+    }
+
+
+async def get_user_token_usage(
+    user_id: str,
+    usage_date: date,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    date_value = usage_date.isoformat()
+
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_token_usage")
+            .select("user_id,date,call_count,total_tokens")
+            .eq("user_id", user_id)
+            .eq("date", date_value)
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("get_user_token_usage", _select)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return {
+        "user_id": user_id,
+        "date": date_value,
+        "call_count": 0,
+        "total_tokens": 0,
+    }
+
+
+async def increment_user_token_usage(
+    user_id: str,
+    tokens_used: int,
+    usage_date: date,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    current = await get_user_token_usage(
+        user_id=user_id,
+        usage_date=usage_date,
+        access_token=access_token,
+    )
+
+    next_call_count = int(current.get("call_count", 0)) + 1
+    next_total_tokens = int(current.get("total_tokens", 0)) + int(max(tokens_used, 0))
+
+    payload = {
+        "user_id": user_id,
+        "date": usage_date.isoformat(),
+        "call_count": next_call_count,
+        "total_tokens": next_total_tokens,
+    }
+
+    def _upsert():
+        return (
+            get_supabase_client(access_token)
+            .table("user_token_usage")
+            .upsert(payload, on_conflict="user_id,date")
+            .execute()
+        )
+
+    response = await _run_with_retry("increment_user_token_usage", _upsert)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return payload
+
+
+async def get_user_xp(
+    user_id: str,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_xp")
+            .select(
+                "user_id,weekly_xp,total_xp,current_streak,longest_streak,last_active_date,updated_at"
+            )
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("get_user_xp", _select)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return {
+        "user_id": user_id,
+        "weekly_xp": 0,
+        "total_xp": 0,
+        "current_streak": 0,
+        "longest_streak": 0,
+        "last_active_date": None,
+        "updated_at": None,
+    }
+
+
+async def upsert_user_xp(
+    user_id: str,
+    weekly_xp: int,
+    total_xp: int,
+    current_streak: int,
+    longest_streak: int,
+    last_active_date: date | None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "user_id": user_id,
+        "weekly_xp": int(max(0, weekly_xp)),
+        "total_xp": int(max(0, total_xp)),
+        "current_streak": int(max(0, current_streak)),
+        "longest_streak": int(max(0, longest_streak)),
+        "last_active_date": last_active_date.isoformat() if last_active_date else None,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+
+    def _upsert():
+        return (
+            get_supabase_client(access_token)
+            .table("user_xp")
+            .upsert(payload, on_conflict="user_id")
+            .execute()
+        )
+
+    response = await _run_with_retry("upsert_user_xp", _upsert)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return payload
+
+
+def _apply_leaderboard_order(query: Any, period: str):
+    if period in {"all_time", "monthly"}:
+        return query.order("total_xp", desc=True).order("weekly_xp", desc=True)
+
+    return query.order("weekly_xp", desc=True).order("total_xp", desc=True)
+
+
+async def list_user_xp_rows(
+    period: str,
+    limit: int,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    def _select():
+        query = (
+            get_supabase_client(access_token)
+            .table("user_xp")
+            .select("user_id,weekly_xp,total_xp,current_streak,longest_streak,updated_at")
+            .limit(max(1, int(limit)))
+        )
+        return _apply_leaderboard_order(query, period).execute()
+
+    response = await _run_with_retry("list_user_xp_rows", _select)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def list_all_user_xp_rows(
+    period: str,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    def _select():
+        query = get_supabase_client(access_token).table("user_xp").select(
+            "user_id,weekly_xp,total_xp,current_streak,longest_streak,updated_at"
+        )
+        return _apply_leaderboard_order(query, period).execute()
+
+    response = await _run_with_retry("list_all_user_xp_rows", _select, timeout_sec=5.0)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def count_user_xp_rows(access_token: str | None = None) -> int:
+    def _count():
+        return (
+            get_supabase_client(access_token)
+            .table("user_xp")
+            .select("user_id", count="exact")
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("count_user_xp_rows", _count)
+    count = getattr(response, "count", None)
+    return int(count or 0)
+
+
+async def list_user_badges(
+    user_id: str,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_badges")
+            .select("id,user_id,badge_type,badge_name,earned_at")
+            .eq("user_id", user_id)
+            .order("earned_at", desc=True)
+            .execute()
+        )
+
+    response = await _run_with_retry("list_user_badges", _select)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def get_user_badge_by_type(
+    user_id: str,
+    badge_type: str,
+    access_token: str | None = None,
+) -> Dict[str, Any] | None:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_badges")
+            .select("id,user_id,badge_type,badge_name,earned_at")
+            .eq("user_id", user_id)
+            .eq("badge_type", badge_type)
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("get_user_badge_by_type", _select)
+    rows = getattr(response, "data", []) or []
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+    return None
+
+
+async def create_user_badge(
+    user_id: str,
+    badge_type: str,
+    badge_name: str,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "user_id": user_id,
+        "badge_type": badge_type,
+        "badge_name": badge_name,
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("user_badges")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("create_user_badge", _insert)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return payload
+
+
+async def get_user_lives(
+    user_id: str,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_lives")
+            .select("user_id,current_lives,last_life_lost_at,last_regen_at,updated_at")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("get_user_lives", _select)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return {
+        "user_id": user_id,
+        "current_lives": 3,
+        "last_life_lost_at": None,
+        "last_regen_at": None,
+        "updated_at": None,
+    }
+
+
+async def upsert_user_lives(
+    user_id: str,
+    current_lives: int,
+    last_life_lost_at: datetime | None,
+    last_regen_at: datetime | None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "user_id": user_id,
+        "current_lives": int(max(0, min(3, current_lives))),
+        "last_life_lost_at": (
+            last_life_lost_at.astimezone(UTC).isoformat() if last_life_lost_at else None
+        ),
+        "last_regen_at": (
+            last_regen_at.astimezone(UTC).isoformat() if last_regen_at else None
+        ),
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+
+    def _upsert():
+        return (
+            get_supabase_client(access_token)
+            .table("user_lives")
+            .upsert(payload, on_conflict="user_id")
+            .execute()
+        )
+
+    response = await _run_with_retry("upsert_user_lives", _upsert)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return payload
+
+
+def _parse_optional_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+    if isinstance(value, str):
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if normalized.endswith("Z"):
+            normalized = normalized[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(normalized)
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+        except ValueError:
+            return None
+
+    return None
+
+
+def _default_user_profile(user_id: str) -> Dict[str, Any]:
+    return {
+        "user_id": user_id,
+        "display_name": None,
+        "avatar_url": None,
+        "user_level": "beginner",
+        "study_goal": None,
+        "daily_minutes": 15,
+        "onboarded_at": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+
+
+async def list_user_profiles_by_ids(
+    user_ids: list[str],
+    access_token: str | None = None,
+) -> Dict[str, Dict[str, Any]]:
+    normalized_ids = list({str(value).strip() for value in user_ids if str(value).strip()})
+    if not normalized_ids:
+        return {}
+
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_profiles")
+            .select("user_id,display_name,avatar_url")
+            .in_("user_id", normalized_ids)
+            .execute()
+        )
+
+    response = await _run_with_retry(
+        "list_user_profiles_by_ids",
+        _select,
+        timeout_sec=5.0,
+    )
+    rows = getattr(response, "data", []) or []
+
+    profiles: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        profile_user_id = str(row.get("user_id", "")).strip()
+        if not profile_user_id:
+            continue
+        profiles[profile_user_id] = {
+            "user_id": profile_user_id,
+            "display_name": row.get("display_name"),
+            "avatar_url": row.get("avatar_url"),
+        }
+
+    return profiles
+
+
+async def get_user_profile(
+    user_id: str,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("user_profiles")
+            .select(
+                "user_id,display_name,avatar_url,user_level,study_goal,daily_minutes,onboarded_at,created_at,updated_at"
+            )
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    response = await _run_with_retry("get_user_profile", _select)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        row = rows[0]
+        return {
+            **_default_user_profile(user_id),
+            **row,
+            "daily_minutes": int(row.get("daily_minutes", 15) or 15),
+            "user_level": str(row.get("user_level") or "beginner"),
+        }
+
+    return _default_user_profile(user_id)
+
+
+async def upsert_user_profile(
+    user_id: str,
+    display_name: str | None,
+    avatar_url: str | None,
+    user_level: str,
+    study_goal: str | None,
+    daily_minutes: int,
+    onboarded_at: datetime | str | None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    onboarded_dt = _parse_optional_datetime(onboarded_at)
+    payload = {
+        "user_id": user_id,
+        "display_name": str(display_name).strip() if display_name else None,
+        "avatar_url": str(avatar_url).strip() if avatar_url else None,
+        "user_level": str(user_level or "beginner").strip().lower(),
+        "study_goal": str(study_goal).strip().lower() if study_goal else None,
+        "daily_minutes": int(max(5, min(180, daily_minutes))),
+        "onboarded_at": (
+            onboarded_dt.astimezone(UTC).isoformat() if onboarded_dt else None
+        ),
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+
+    def _upsert():
+        return (
+            get_supabase_client(access_token)
+            .table("user_profiles")
+            .upsert(payload, on_conflict="user_id")
+            .execute()
+        )
+
+    response = await _run_with_retry("upsert_user_profile", _upsert)
+    rows = getattr(response, "data", []) or []
+
+    if rows and isinstance(rows[0], dict):
+        return {
+            **_default_user_profile(user_id),
+            **rows[0],
+            "daily_minutes": int(rows[0].get("daily_minutes", 15) or 15),
+            "user_level": str(rows[0].get("user_level") or "beginner"),
+        }
+
+    return {
+        **_default_user_profile(user_id),
+        **payload,
     }

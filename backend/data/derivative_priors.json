@@ -1,24 +1,85 @@
 {
-  "hypotheses": ["H01_Chain", "H02_ProdQuot", "H03_Trig", "H04_PowerExp", "H05_Notation", "H06_SecondDeriv", "H07_Concept", "H08_Proficient"],
+  "hypotheses": ["H01_Trig", "H02_ExpLog", "H03_Chain", "H04_Rules"],
   "priors": {
-    "H01_Chain": 0.22, "H02_ProdQuot": 0.18, "H03_Trig": 0.15,
-    "H04_PowerExp": 0.12, "H05_Notation": 0.10, "H06_SecondDeriv": 0.08,
-    "H07_Concept": 0.07, "H08_Proficient": 0.08
+    "H01_Trig": 0.25,
+    "H02_ExpLog": 0.25,
+    "H03_Chain": 0.25,
+    "H04_Rules": 0.25
   },
   "likelihoods": {
     "answer_pattern": {
-      "E_MISSING_INNER": {"H01_Chain": 0.55, "H02_ProdQuot": 0.03, "H03_Trig": 0.02, "H04_PowerExp": 0.05, "H05_Notation": 0.01, "H06_SecondDeriv": 0.07, "H07_Concept": 0.04, "H08_Proficient": 0.01},
-      "E_WRONG_OPERATOR": {"H01_Chain": 0.02, "H02_ProdQuot": 0.52, "H03_Trig": 0.03, "H04_PowerExp": 0.04, "H05_Notation": 0.02, "H06_SecondDeriv": 0.05, "H07_Concept": 0.04, "H08_Proficient": 0.02},
-      "E_WRONG_TRIG_FORMULA": {"H01_Chain": 0.02, "H02_ProdQuot": 0.03, "H03_Trig": 0.58, "H04_PowerExp": 0.03, "H05_Notation": 0.02, "H06_SecondDeriv": 0.04, "H07_Concept": 0.03, "H08_Proficient": 0.01},
-      "E_WRONG_POWER_EXP": {"H01_Chain": 0.05, "H02_ProdQuot": 0.04, "H03_Trig": 0.03, "H04_PowerExp": 0.54, "H05_Notation": 0.02, "H06_SecondDeriv": 0.06, "H07_Concept": 0.05, "H08_Proficient": 0.02},
-      "E_WRONG_SIGN": {"H01_Chain": 0.04, "H02_ProdQuot": 0.06, "H03_Trig": 0.04, "H04_PowerExp": 0.05, "H05_Notation": 0.48, "H06_SecondDeriv": 0.05, "H07_Concept": 0.06, "H08_Proficient": 0.02},
-      "E_CASCADE_ERROR": {"H01_Chain": 0.10, "H02_ProdQuot": 0.06, "H03_Trig": 0.04, "H04_PowerExp": 0.07, "H05_Notation": 0.03, "H06_SecondDeriv": 0.58, "H07_Concept": 0.07, "H08_Proficient": 0.01},
-      "E_CONCEPTUAL_MISMATCH": {"H01_Chain": 0.03, "H02_ProdQuot": 0.04, "H03_Trig": 0.03, "H04_PowerExp": 0.05, "H05_Notation": 0.04, "H06_SecondDeriv": 0.08, "H07_Concept": 0.42, "H08_Proficient": 0.03},
-      "E_AMBIGUOUS_ERROR": {"H01_Chain": 0.07, "H02_ProdQuot": 0.07, "H03_Trig": 0.13, "H04_PowerExp": 0.09, "H05_Notation": 0.08, "H06_SecondDeriv": 0.06, "H07_Concept": 0.09, "H08_Proficient": 0.03},
-      "E_CORRECT": {"H01_Chain": 0.12, "H02_ProdQuot": 0.15, "H03_Trig": 0.10, "H04_PowerExp": 0.18, "H05_Notation": 0.25, "H06_SecondDeriv": 0.08, "H07_Concept": 0.40, "H08_Proficient": 0.92}
+      "E_MISSING_INNER": {
+        "H01_Trig": 0.06,
+        "H02_ExpLog": 0.08,
+        "H03_Chain": 0.72,
+        "H04_Rules": 0.14
+      },
+      "E_WRONG_OPERATOR": {
+        "H01_Trig": 0.09,
+        "H02_ExpLog": 0.08,
+        "H03_Chain": 0.15,
+        "H04_Rules": 0.68
+      },
+      "E_WRONG_TRIG_FORMULA": {
+        "H01_Trig": 0.74,
+        "H02_ExpLog": 0.06,
+        "H03_Chain": 0.12,
+        "H04_Rules": 0.08
+      },
+      "E_WRONG_POWER_EXP": {
+        "H01_Trig": 0.06,
+        "H02_ExpLog": 0.72,
+        "H03_Chain": 0.08,
+        "H04_Rules": 0.14
+      },
+      "E_WRONG_SIGN": {
+        "H01_Trig": 0.22,
+        "H02_ExpLog": 0.14,
+        "H03_Chain": 0.18,
+        "H04_Rules": 0.46
+      },
+      "E_CASCADE_ERROR": {
+        "H01_Trig": 0.12,
+        "H02_ExpLog": 0.18,
+        "H03_Chain": 0.38,
+        "H04_Rules": 0.32
+      },
+      "E_CONCEPTUAL_MISMATCH": {
+        "H01_Trig": 0.18,
+        "H02_ExpLog": 0.24,
+        "H03_Chain": 0.34,
+        "H04_Rules": 0.24
+      },
+      "E_AMBIGUOUS_ERROR": {
+        "H01_Trig": 0.24,
+        "H02_ExpLog": 0.26,
+        "H03_Chain": 0.25,
+        "H04_Rules": 0.25
+      },
+      "E_CORRECT": {
+        "H01_Trig": 0.58,
+        "H02_ExpLog": 0.62,
+        "H03_Chain": 0.56,
+        "H04_Rules": 0.66
+      }
     },
-    "hint_used": { "H01_Chain": 0.75, "H02_ProdQuot": 0.70, "H03_Trig": 0.65, "H04_PowerExp": 0.60, "H05_Notation": 0.40, "H06_SecondDeriv": 0.80, "H07_Concept": 0.50, "H08_Proficient": 0.10},
-    "slow_response": { "H01_Chain": 0.45, "H02_ProdQuot": 0.40, "H03_Trig": 0.35, "H04_PowerExp": 0.50, "H05_Notation": 0.60, "H06_SecondDeriv": 0.55, "H07_Concept": 0.30, "H08_Proficient": 0.15},
-    "skip_question": { "H01_Chain": 0.20, "H02_ProdQuot": 0.15, "H03_Trig": 0.10, "H04_PowerExp": 0.25, "H05_Notation": 0.30, "H06_SecondDeriv": 0.15, "H07_Concept": 0.45, "H08_Proficient": 0.05}
+    "hint_used": {
+      "H01_Trig": 0.62,
+      "H02_ExpLog": 0.64,
+      "H03_Chain": 0.78,
+      "H04_Rules": 0.69
+    },
+    "slow_response": {
+      "H01_Trig": 0.36,
+      "H02_ExpLog": 0.41,
+      "H03_Chain": 0.52,
+      "H04_Rules": 0.48
+    },
+    "skip_question": {
+      "H01_Trig": 0.11,
+      "H02_ExpLog": 0.18,
+      "H03_Chain": 0.22,
+      "H04_Rules": 0.27
+    }
   }
 }
