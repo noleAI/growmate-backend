@@ -1,12 +1,75 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import random
 from typing import Any, Dict, List
 
 from core.user_classifier import UserLevel
 
 
 HYPOTHESES = ["H01_Trig", "H02_ExpLog", "H03_Chain", "H04_Rules"]
+
+
+def select_quiz_questions_for_mode(
+    question_pool: List[Dict[str, Any]],
+    mode: str,
+    num_questions: int = 10,
+) -> List[Dict[str, Any]]:
+    if num_questions <= 0 or not question_pool:
+        return []
+
+    normalized_mode = str(mode or "explore").strip().lower()
+    if normalized_mode not in {"exam_prep", "explore"}:
+        normalized_mode = "explore"
+
+    if normalized_mode == "exam_prep":
+        target = {"easy": 0.2, "medium": 0.4, "hard": 0.4}
+    else:
+        target = {"easy": 0.4, "medium": 0.4, "hard": 0.2}
+
+    target_counts = _target_difficulty_counts(num_questions, target)
+
+    grouped: Dict[str, List[Dict[str, Any]]] = {
+        "easy": [],
+        "medium": [],
+        "hard": [],
+    }
+    for question in question_pool:
+        grouped[_difficulty(question)].append(question)
+
+    for bucket in grouped.values():
+        random.shuffle(bucket)
+
+    selected: List[Dict[str, Any]] = []
+    used_ids: set[str] = set()
+
+    for difficulty in ["easy", "medium", "hard"]:
+        need = int(target_counts[difficulty])
+        for question in grouped[difficulty]:
+            if need <= 0:
+                break
+            qid = _question_id(question)
+            if qid in used_ids:
+                continue
+            selected.append(question)
+            used_ids.add(qid)
+            need -= 1
+
+    if len(selected) < num_questions:
+        leftovers = [
+            question
+            for question in question_pool
+            if _question_id(question) not in used_ids
+        ]
+        random.shuffle(leftovers)
+        for question in leftovers:
+            if len(selected) >= num_questions:
+                break
+            selected.append(question)
+            used_ids.add(_question_id(question))
+
+    random.shuffle(selected)
+    return selected[:num_questions]
 
 
 def compute_average_level(player_levels: List[UserLevel]) -> UserLevel:

@@ -11,12 +11,16 @@ class Settings(BaseSettings):
     supabase_jwt_audience: str | None = "authenticated"
     environment: str = "development"
     debug: bool = False
+    quiz_daily_session_limit: int = 5
+    quiz_hmac_secret: str | None = None
+    quiz_signature_ttl_seconds: int = 300
 
     # Internal thresholds
     hitl_uncertainty_threshold: float = 0.75
     exhaustion_threshold: float = 0.80
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # Ignore unknown env keys for forward-compatibility (e.g., future GCP/LLM vars).
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 @lru_cache()

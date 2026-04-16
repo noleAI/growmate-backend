@@ -1,0 +1,156 @@
+{
+  "version": "1.0",
+  "topic": "derivative",
+  "questions": [
+    {
+      "id": "onb_01",
+      "order": 1,
+      "difficulty": "easy",
+      "weight": 1,
+      "content": "Đạo hàm của y = 5 là gì?",
+      "options": [
+        {"id": "A", "text": "0"},
+        {"id": "B", "text": "1"},
+        {"id": "C", "text": "5"},
+        {"id": "D", "text": "x"}
+      ],
+      "correct_option_id": "A",
+      "related_hypothesis": "H04_Rules"
+    },
+    {
+      "id": "onb_02",
+      "order": 2,
+      "difficulty": "easy",
+      "weight": 1,
+      "content": "Đạo hàm của y = x^3 là gì?",
+      "options": [
+        {"id": "A", "text": "x^2"},
+        {"id": "B", "text": "3x^2"},
+        {"id": "C", "text": "3x"},
+        {"id": "D", "text": "x^3"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H04_Rules"
+    },
+    {
+      "id": "onb_03",
+      "order": 3,
+      "difficulty": "easy",
+      "weight": 1,
+      "content": "Đạo hàm của y = sin(x) là gì?",
+      "options": [
+        {"id": "A", "text": "sin(x)"},
+        {"id": "B", "text": "-sin(x)"},
+        {"id": "C", "text": "cos(x)"},
+        {"id": "D", "text": "-cos(x)"}
+      ],
+      "correct_option_id": "C",
+      "related_hypothesis": "H01_Trig"
+    },
+    {
+      "id": "onb_04",
+      "order": 4,
+      "difficulty": "medium",
+      "weight": 2,
+      "content": "Đạo hàm của y = e^(2x) là gì?",
+      "options": [
+        {"id": "A", "text": "e^(2x)"},
+        {"id": "B", "text": "2e^(2x)"},
+        {"id": "C", "text": "2xe^(2x)"},
+        {"id": "D", "text": "4e^(2x)"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H02_ExpLog"
+    },
+    {
+      "id": "onb_05",
+      "order": 5,
+      "difficulty": "medium",
+      "weight": 2,
+      "content": "Đạo hàm của y = ln(x) là gì?",
+      "options": [
+        {"id": "A", "text": "x"},
+        {"id": "B", "text": "1/x"},
+        {"id": "C", "text": "ln(x)"},
+        {"id": "D", "text": "1/(x^2)"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H02_ExpLog"
+    },
+    {
+      "id": "onb_06",
+      "order": 6,
+      "difficulty": "medium",
+      "weight": 2,
+      "content": "Đạo hàm của y = (x^2 + 1)^3 là gì?",
+      "options": [
+        {"id": "A", "text": "3(x^2 + 1)^2"},
+        {"id": "B", "text": "6x(x^2 + 1)^2"},
+        {"id": "C", "text": "(x^2 + 1)^2"},
+        {"id": "D", "text": "6x(x^2 + 1)"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H03_Chain"
+    },
+    {
+      "id": "onb_07",
+      "order": 7,
+      "difficulty": "hard",
+      "weight": 3,
+      "content": "Đạo hàm của y = sin(x^2) là gì?",
+      "options": [
+        {"id": "A", "text": "cos(x^2)"},
+        {"id": "B", "text": "2x cos(x^2)"},
+        {"id": "C", "text": "2x sin(x^2)"},
+        {"id": "D", "text": "cos(2x)"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H03_Chain"
+    },
+    {
+      "id": "onb_08",
+      "order": 8,
+      "difficulty": "hard",
+      "weight": 3,
+      "content": "Đạo hàm của y = x^x là gì?",
+      "options": [
+        {"id": "A", "text": "x^(x-1)"},
+        {"id": "B", "text": "x^x(ln(x)+1)"},
+        {"id": "C", "text": "ln(x)"},
+        {"id": "D", "text": "x^x ln(x)"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H02_ExpLog"
+    },
+    {
+      "id": "onb_09",
+      "order": 9,
+      "difficulty": "hard",
+      "weight": 3,
+      "content": "Đạo hàm của y = (x+1)/(x-1) là gì?",
+      "options": [
+        {"id": "A", "text": "2/(x-1)^2"},
+        {"id": "B", "text": "-2/(x-1)^2"},
+        {"id": "C", "text": "1/(x-1)"},
+        {"id": "D", "text": "(x-1)^2"}
+      ],
+      "correct_option_id": "B",
+      "related_hypothesis": "H04_Rules"
+    },
+    {
+      "id": "onb_10",
+      "order": 10,
+      "difficulty": "hard",
+      "weight": 3,
+      "content": "Đạo hàm của y = e^(sin(x)) là gì?",
+      "options": [
+        {"id": "A", "text": "e^(sin(x))"},
+        {"id": "B", "text": "e^(sin(x)) sin(x)"},
+        {"id": "C", "text": "e^(sin(x)) cos(x)"},
+        {"id": "D", "text": "cos(x)"}
+      ],
+      "correct_option_id": "C",
+      "related_hypothesis": "H03_Chain"
+    }
+  ]
+}

@@ -22,6 +22,19 @@ class _OrchestratorStub:
         }
 
 
+class _RequestStub:
+    method = "POST"
+
+    class _URL:
+        path = "/api/v1/sessions/sess/interact"
+
+    url = _URL()
+    headers: dict = {}
+
+    async def body(self) -> bytes:
+        return b"{}"
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
     stub = _OrchestratorStub()
@@ -39,10 +52,13 @@ async def test_orchestrator_route_invokes_runtime(monkeypatch) -> None:
             behavior_signals={"response_time_ms": 8000},
         ),
         user={"sub": "student-1"},
+        access_token="token-1",
     )
 
     assert result["status"] == "ok"
     assert result["result"]["action"] == "show_hint"
+    assert stub.last_payload is not None
+    assert stub.last_payload["access_token"] == "token-1"
 
 
 @pytest.mark.asyncio
@@ -65,6 +81,7 @@ async def test_orchestrator_route_forwards_xp_and_mode(monkeypatch) -> None:
             classification_level="advanced",
         ),
         user={"sub": "student-2"},
+        access_token="token-2",
     )
 
     assert result["status"] == "ok"
@@ -72,25 +89,79 @@ async def test_orchestrator_route_forwards_xp_and_mode(monkeypatch) -> None:
     assert stub.last_payload["xp_data"] == {"recent_xp_gain": 80, "streak_days": 3}
     assert stub.last_payload["mode"] == "explore"
     assert stub.last_payload["classification_level"] == "advanced"
+    assert stub.last_payload["access_token"] == "token-2"
 
 
 @pytest.mark.asyncio
 async def test_session_interact_uses_orchestrator(monkeypatch) -> None:
+    stub = _OrchestratorStub()
+
+    async def _can_play_stub(**kwargs) -> bool:
+        del kwargs
+        return True
+
     monkeypatch.setattr(
         session_route,
         "get_orchestrator",
-        lambda session_id=None: _OrchestratorStub(),
+        lambda session_id=None: stub,
     )
+    monkeypatch.setattr(session_route, "can_play", _can_play_stub)
 
     response = await session_route.interact(
+        http_request=_RequestStub(),
         session_id="sess-2",
         request=InteractionRequest(action_type="submit_answer", response_data={"answer": "A"}),
         user={"sub": "student-1"},
+        access_token="token-3",
     )
 
     assert response.next_node_type == "show_hint"
     assert response.content == "hint text"
     assert response.belief_entropy == 0.33
+    assert stub.last_payload is not None
+    assert stub.last_payload["access_token"] == "token-3"
+
+
+@pytest.mark.asyncio
+async def test_session_interact_returns_403_when_no_lives(monkeypatch) -> None:
+    stub = _OrchestratorStub()
+
+    async def _can_play_stub(**kwargs) -> bool:
+        del kwargs
+        return False
+
+    async def _check_regen_stub(**kwargs) -> dict:
+        del kwargs
+        return {
+            "current": 0,
+            "max": 3,
+            "can_play": False,
+            "next_regen_in_seconds": 1200,
+            "next_regen_at": "2026-04-16T10:00:00+00:00",
+        }
+
+    monkeypatch.setattr(
+        session_route,
+        "get_orchestrator",
+        lambda session_id=None: stub,
+    )
+    monkeypatch.setattr(session_route, "can_play", _can_play_stub)
+    monkeypatch.setattr(session_route, "check_regen", _check_regen_stub)
+
+    response = await session_route.interact(
+        http_request=_RequestStub(),
+        session_id="sess-2b",
+        request=InteractionRequest(
+            action_type="submit_answer",
+            response_data={"answer": "A"},
+            mode="exam_prep",
+        ),
+        user={"sub": "student-1"},
+        access_token="token-3",
+    )
+
+    assert response.status_code == 403
+    assert b"no_lives_remaining" in response.body
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,71 @@
+{
+  "categories": [
+    {
+      "id": "basic_derivatives",
+      "name": "Đạo hàm cơ bản",
+      "description": "Hằng số, lũy thừa, căn bậc hai và dạng đa thức cơ bản.",
+      "formula_ids": [
+        "constant_derivative",
+        "power_rule",
+        "linear_derivative",
+        "root_derivative",
+        "reciprocal_derivative",
+        "polynomial_combo"
+      ]
+    },
+    {
+      "id": "arithmetic_rules",
+      "name": "Quy tắc tính",
+      "description": "Tổng, hiệu, tích, thương trong đạo hàm.",
+      "formula_ids": [
+        "sum_rule",
+        "difference_rule",
+        "product_rule",
+        "quotient_rule"
+      ]
+    },
+    {
+      "id": "basic_trig",
+      "name": "Đạo hàm lượng giác",
+      "description": "Các công thức sin, cos, tan và biến thể hàm hợp.",
+      "formula_ids": [
+        "sin_derivative",
+        "cos_derivative",
+        "tan_derivative",
+        "cot_derivative",
+        "sec_derivative",
+        "csc_derivative",
+        "sin_composite",
+        "cos_composite"
+      ]
+    },
+    {
+      "id": "exp_log",
+      "name": "Đạo hàm mũ và logarit",
+      "description": "Công thức e^x, a^x, ln, log và dạng hàm hợp liên quan.",
+      "formula_ids": [
+        "exp_derivative",
+        "a_pow_x_derivative",
+        "ln_derivative",
+        "log_a_x_derivative",
+        "exp_composite",
+        "ln_composite",
+        "x_pow_x_derivative"
+      ]
+    },
+    {
+      "id": "chain_rule",
+      "name": "Quy tắc chain rule",
+      "description": "Quy tắc đạo hàm hàm hợp từ cơ bản đến nâng cao.",
+      "formula_ids": [
+        "chain_rule_general",
+        "chain_square",
+        "chain_sqrt",
+        "chain_sin",
+        "chain_ln",
+        "implicit_chain",
+        "nested_chain"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import config, inspection, orchestrator, session
+from api.routes import (
+    config,
+    formulas,
+    inspection,
+    leaderboard,
+    lives,
+    onboarding,
+    orchestrator,
+    quota,
+    quiz,
+    session,
+    session_recovery,
+    user_profile,
+)
 from api.routes.orchestrator_runtime import set_shared_data_packages
 from api.ws import behavior, dashboard
 from core.config import get_settings
@@ -52,6 +65,14 @@ app.include_router(
 )  # Merged based on interact route
 app.include_router(inspection.router, prefix="/api/v1/inspection", tags=["Inspection"])
 app.include_router(config.router, prefix="/api/v1/configs", tags=["Config"])
+app.include_router(quota.router, prefix="/api/v1", tags=["Quota"])
+app.include_router(quiz.router, prefix="/api/v1", tags=["Quiz"])
+app.include_router(session_recovery.router, prefix="/api/v1", tags=["SessionRecovery"])
+app.include_router(leaderboard.router, prefix="/api/v1", tags=["Leaderboard"])
+app.include_router(lives.router, prefix="/api/v1", tags=["Lives"])
+app.include_router(formulas.router, prefix="/api/v1", tags=["Formulas"])
+app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["Onboarding"])
+app.include_router(user_profile.router, prefix="/api/v1", tags=["UserProfile"])
 app.include_router(
     orchestrator.router,
     prefix="/api/v1/orchestrator",

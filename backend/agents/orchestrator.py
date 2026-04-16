@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -14,11 +14,13 @@ from core.formula_recommender import FormulaRecommender
 from core.llm_service import LLMService
 from core.payload_formatter import format_dashboard_payload
 from core.state_manager import StateManager
+from core.supabase_client import increment_user_token_usage
 from core.user_classifier import classify
 from orchestrator.engine import OrchestratorEngine
 from orchestrator.schemas import OrchestratorDecision
 
 logger = logging.getLogger("orchestrator")
+VN_TZ = timezone(timedelta(hours=7))
 
 
 class AgenticOrchestrator:
@@ -69,6 +71,16 @@ class AgenticOrchestrator:
         start_time = time.time()
         state = await self.state_mgr.load_or_init(session_id)
         student_id = payload.get("student_id")
+        access_token_raw = payload.get("access_token")
+        access_token = access_token_raw if isinstance(access_token_raw, str) else None
+
+        register_context = getattr(self.state_mgr, "register_session_context", None)
+        if callable(register_context):
+            register_context(
+                session_id=session_id,
+                student_id=student_id,
+                access_token=access_token,
+            )
 
         mode = str(payload.get("mode") or state.mode or state.strategy_state.get("mode", "normal"))
         classification_level = payload.get("classification_level")
@@ -85,6 +97,7 @@ class AgenticOrchestrator:
         state.user_classification_level = classification_level
         state.strategy_state["mode"] = mode
         state.strategy_state["classification_level"] = classification_level
+        state.strategy_state["student_id"] = str(student_id or "").strip()
 
         if bool(payload.get("resume", False)):
             state.pause_state = False
@@ -109,6 +122,9 @@ class AgenticOrchestrator:
             state.last_signal_time = signal_entry["timestamp"]
 
         state.last_interaction_timestamp = datetime.now(UTC)
+        state.strategy_state["last_interaction_at"] = (
+            state.last_interaction_timestamp.isoformat()
+        )
 
         academic_agent = self.agents.get("academic")
         apply_profile_prior = getattr(academic_agent, "apply_profile_prior", None)
@@ -198,6 +214,26 @@ class AgenticOrchestrator:
             state.strategy_state["q_state"] = q_state
 
         state.step += 1
+        total_questions = int(state.strategy_state.get("total_questions", 10) or 10)
+        if total_questions <= 0:
+            total_questions = 10
+        state.strategy_state["total_questions"] = total_questions
+        state.strategy_state["last_question_index"] = min(
+            total_questions,
+            max(0, int(state.step or 0)),
+        )
+        state.strategy_state["progress_percent"] = min(
+            100,
+            int(
+                round(
+                    (
+                        state.strategy_state["last_question_index"]
+                        / max(1, total_questions)
+                    )
+                    * 100
+                )
+            ),
+        )
 
         orchestrator_decision = self.decision_engine.run_step(
             academic_state=state.academic_state,
@@ -234,18 +270,23 @@ class AgenticOrchestrator:
             final_action_payload = {
                 "reason": reason,
                 "text": (
-                    "Phien hoc da tam dung do phat hien thao tac bat thuong."
+                    "Phiên học đã tạm dừng do phát hiện thao tác bất thường."
                     if reason == "spam"
-                    else "Ban da tam nghi qua lau. Bam tiep tuc khi san sang hoc lai."
+                    else "Bạn đã tạm nghỉ quá lâu. Bấm tiếp tục khi sẵn sàng học lại."
                 ),
             }
         elif final_action == "gentle_redirect":
             final_action_payload = {
                 "reason": "off_topic",
-                "text": "Minh se dua cuoc tro chuyen quay lai bai hoc dao ham de hoc hieu qua hon.",
+                "text": "Mình sẽ đưa cuộc trò chuyện quay lại bài học đạo hàm để học hiệu quả hơn.",
             }
         elif final_action in ["hint", "show_hint", "de_stress", "hitl_brief"]:
-            llm_response = await self._call_llm_with_fallback(final_action, state)
+            llm_response = await self._call_llm_with_fallback(
+                final_action,
+                state,
+                student_id=student_id,
+                access_token=access_token,
+            )
             final_action_payload = {
                 "text": llm_response.text,
                 "fallback_used": llm_response.fallback_used,
@@ -524,10 +565,59 @@ class AgenticOrchestrator:
 
         return strategy.action if strategy.action else academic.action
 
-    async def _call_llm_with_fallback(self, action_type: str, state: SessionState):
+    async def _call_llm_with_fallback(
+        self,
+        action_type: str,
+        state: SessionState,
+        student_id: Optional[str] = None,
+        access_token: Optional[str] = None,
+    ):
         prompt = self._build_prompt(action_type, state)
         fallback = self._get_fallback_template(action_type)
-        return await self.llm.generate(prompt, fallback)
+        response = await self.llm.generate(prompt, fallback)
+        await self._track_llm_usage(
+            student_id=student_id,
+            session_id=state.session_id,
+            response_text=response.text,
+            access_token=access_token,
+        )
+        return response
+
+    async def _track_llm_usage(
+        self,
+        student_id: Optional[str],
+        session_id: str,
+        response_text: str,
+        access_token: Optional[str],
+    ) -> None:
+        user_id = str(student_id or "").strip()
+        if not user_id:
+            return
+
+        tokens_used = self._estimate_tokens(response_text)
+        usage_date = datetime.now(VN_TZ).date()
+
+        try:
+            await increment_user_token_usage(
+                user_id=user_id,
+                tokens_used=tokens_used,
+                usage_date=usage_date,
+                access_token=access_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to increment token usage for user=%s session=%s: %s",
+                user_id,
+                session_id,
+                exc,
+            )
+
+    def _estimate_tokens(self, text: str) -> int:
+        cleaned = text.strip()
+        if not cleaned:
+            return 0
+        # Use a simple approximation when provider token metadata is unavailable.
+        return max(1, len(cleaned) // 4)
 
     def _build_prompt(self, action_type: str, state: SessionState) -> str:
         top_hypothesis = str(state.academic_state.get("top_hypothesis", ""))
@@ -558,14 +648,14 @@ class AgenticOrchestrator:
 
     def _get_fallback_template(self, action_type: str) -> str:
         fallback_templates = {
-            "hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
-            "show_hint": "Thu nho bai toan thanh tung buoc nho. Hay bat dau bang viec xac dinh quy tac dao ham phu hop.",
-            "de_stress": "Ban dang co dau hieu met. Minh de xuat nghi 60 giay, uong nuoc, sau do quay lai voi 1 cau de hon.",
-            "hitl_brief": "He thong da phat hien do bat dinh cao. Se chuyen yeu cau cho nguoi huong dan ho tro tiep theo.",
+            "hint": "Thử nhỏ bài toán thành từng bước nhỏ. Hãy bắt đầu bằng việc xác định quy tắc đạo hàm phù hợp.",
+            "show_hint": "Thử nhỏ bài toán thành từng bước nhỏ. Hãy bắt đầu bằng việc xác định quy tắc đạo hàm phù hợp.",
+            "de_stress": "Bạn đang có dấu hiệu mệt. Mình đề xuất nghỉ 60 giây, uống nước, sau đó quay lại với 1 câu dễ hơn.",
+            "hitl_brief": "Hệ thống đã phát hiện độ bất định cao. Sẽ chuyển yêu cầu cho người hướng dẫn hỗ trợ tiếp theo.",
         }
         return fallback_templates.get(
             action_type,
-            "Hay tiep tuc voi toc do vua phai. Neu can, minh co the dua them goi y tung buoc.",
+            "Hãy tiếp tục với tốc độ vừa phải. Nếu cần, mình có thể đưa thêm gợi ý từng bước.",
         )
 
     def _is_pf_payload(self, payload: Dict[str, Any]) -> bool:
