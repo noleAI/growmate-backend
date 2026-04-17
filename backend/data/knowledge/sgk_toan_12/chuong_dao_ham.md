@@ -1,27 +1,27 @@
-# Dao ham co ban lop 12
+# Đạo hàm cơ bản lớp 12
 
-## Khai niem dao ham
-Dao ham tai diem x0 la gioi han cua ti so sai phan.
-Cong thuc: f'(x0) = lim(h->0) (f(x0+h)-f(x0))/h.
+## Khái niệm đạo hàm
+Đạo hàm tại điểm $x_0$ là giới hạn của tỉ số sai phân.
+Công thức: $f'(x_0)=\lim_{h\to 0}\dfrac{f(x_0+h)-f(x_0)}{h}$.
 
-## Quy tac tong va hieu
-(f(x) + g(x))' = f'(x) + g'(x).
-(f(x) - g(x))' = f'(x) - g'(x).
+## Quy tắc tổng và hiệu
+$(f(x) + g(x))' = f'(x) + g'(x)$.
+$(f(x) - g(x))' = f'(x) - g'(x)$.
 
-## Quy tac tich va thuong
-(f(x)g(x))' = f'(x)g(x) + f(x)g'(x).
-(f(x)/g(x))' = (f'(x)g(x)-f(x)g'(x))/g(x)^2, voi g(x) != 0.
+## Quy tắc tích và thương
+$(f(x)g(x))' = f'(x)g(x) + f(x)g'(x)$.
+$\left(\dfrac{f(x)}{g(x)}\right)' = \dfrac{f'(x)g(x)-f(x)g'(x)}{g(x)^2}$, với $g(x)\neq 0$.
 
-## Dao ham luong giac
-(sin x)' = cos x.
-(cos x)' = -sin x.
-(tan x)' = 1/cos^2 x.
+## Đạo hàm lượng giác
+$(\sin x)' = \cos x$.
+$(\cos x)' = -\sin x$.
+$(\tan x)' = \dfrac{1}{\cos^2 x}$.
 
-## Dao ham ham mu va logarit
-(e^x)' = e^x.
-(a^x)' = a^x ln(a), voi a > 0 va a != 1.
-(ln x)' = 1/x, voi x > 0.
+## Đạo hàm hàm mũ và logarit
+$(e^x)' = e^x$.
+$(a^x)' = a^x\ln(a)$, với $a > 0$ và $a\neq 1$.
+$(\ln x)' = \dfrac{1}{x}$, với $x > 0$.
 
-## Quy tac ham hop
-Neu y = f(u) va u = g(x), thi y' = f'(u) * u'.
-Vi du: y = sin(3x^2), thi y' = cos(3x^2) * 6x.
+## Quy tắc hàm hợp
+Nếu $y = f(u)$ và $u = g(x)$, thì $y' = f'(u)\cdot u'$.
+Ví dụ: $y = \sin(3x^2)$, thì $y' = \cos(3x^2)\cdot 6x$.

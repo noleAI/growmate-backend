@@ -4,6 +4,7 @@
       "id": "basic_derivatives",
       "name": "Đạo hàm cơ bản",
       "description": "Hằng số, lũy thừa, căn bậc hai và dạng đa thức cơ bản.",
+      "description_latex": "Hằng số, lũy thừa, căn bậc hai và dạng đa thức cơ bản: $(c)'=0$, $(x^n)'=nx^{n-1}$, $(\\sqrt{x})'=\\dfrac{1}{2\\sqrt{x}}$.",
       "formula_ids": [
         "constant_derivative",
         "power_rule",
@@ -17,6 +18,7 @@
       "id": "arithmetic_rules",
       "name": "Quy tắc tính",
       "description": "Tổng, hiệu, tích, thương trong đạo hàm.",
+      "description_latex": "Tổng, hiệu, tích, thương trong đạo hàm: $(u+v)'=u'+v'$, $(u-v)'=u'-v'$, $(uv)'=u'v+uv'$, $\\left(\\dfrac{u}{v}\\right)'=\\dfrac{u'v-uv'}{v^2}$.",
       "formula_ids": [
         "sum_rule",
         "difference_rule",
@@ -28,6 +30,7 @@
       "id": "basic_trig",
       "name": "Đạo hàm lượng giác",
       "description": "Các công thức sin, cos, tan và biến thể hàm hợp.",
+      "description_latex": "Các công thức lượng giác cơ bản và hàm hợp: $(\\sin x)'=\\cos x$, $(\\cos x)'=-\\sin x$, $(\\tan x)'=\\sec^2x$.",
       "formula_ids": [
         "sin_derivative",
         "cos_derivative",
@@ -43,6 +46,7 @@
       "id": "exp_log",
       "name": "Đạo hàm mũ và logarit",
       "description": "Công thức e^x, a^x, ln, log và dạng hàm hợp liên quan.",
+      "description_latex": "Công thức mũ và logarit: $(e^x)'=e^x$, $(a^x)'=a^x\\ln a$, $(\\ln x)'=\\dfrac{1}{x}$ và các dạng hàm hợp.",
       "formula_ids": [
         "exp_derivative",
         "a_pow_x_derivative",
@@ -57,6 +61,7 @@
       "id": "chain_rule",
       "name": "Quy tắc chain rule",
       "description": "Quy tắc đạo hàm hàm hợp từ cơ bản đến nâng cao.",
+      "description_latex": "Quy tắc đạo hàm hàm hợp: $(f(g(x)))'=f'(g(x))g'(x)$, áp dụng từ cơ bản đến nâng cao.",
       "formula_ids": [
         "chain_rule_general",
         "chain_square",

@@ -2,16 +2,19 @@
   {
     "chapter": "dao_ham",
     "section": "sample_chain_rule_1",
-    "content": "Bai mau: y = (2x+1)^5. Dat u = 2x+1 => y = u^5. Khi do y' = 5u^4 * u' = 5(2x+1)^4 * 2 = 10(2x+1)^4."
+    "content": "Bài mẫu: $y = (2x+1)^5$. Đặt $u = 2x+1 \\Rightarrow y = u^5$. Khi đó $y' = 5u^4\\cdot u' = 5(2x+1)^4\\cdot 2 = 10(2x+1)^4$.",
+    "latex": "y=(2x+1)^5,\\ u=2x+1 \\Rightarrow y=u^5,\\ y'=5u^4\\cdot u'=10(2x+1)^4"
   },
   {
     "chapter": "dao_ham",
     "section": "sample_product_rule_1",
-    "content": "Bai mau: y = x^2 sin x. Dung quy tac tich: y' = 2x sin x + x^2 cos x."
+    "content": "Bài mẫu: $y = x^2\\sin x$. Dùng quy tắc tích: $y' = 2x\\sin x + x^2\\cos x$.",
+    "latex": "y=x^2\\sin x,\\ y'=2x\\sin x + x^2\\cos x"
   },
   {
     "chapter": "dao_ham",
     "section": "sample_quotient_rule_1",
-    "content": "Bai mau: y = (x^2+1)/(x+1). Dung quy tac thuong: y' = ((2x)(x+1) - (x^2+1)*1)/(x+1)^2."
+    "content": "Bài mẫu: $y = \\dfrac{x^2+1}{x+1}$. Dùng quy tắc thương: $y' = \\dfrac{(2x)(x+1) - (x^2+1)\\cdot 1}{(x+1)^2}$.",
+    "latex": "y=\\dfrac{x^2+1}{x+1},\\ y'=\\dfrac{(2x)(x+1)-(x^2+1)\\cdot 1}{(x+1)^2}"
   }
 ]
