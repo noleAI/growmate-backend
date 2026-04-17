@@ -66,9 +66,16 @@ def _safe_int(value: Any, default: int = 0) -> int:
 def _normalize_attempt_row(row: dict[str, Any]) -> dict[str, Any]:
     evaluation = row.get("evaluation") if isinstance(row.get("evaluation"), dict) else {}
     user_answer = row.get("user_answer") if isinstance(row.get("user_answer"), dict) else {}
+    question_id = str(
+        row.get("question_id")
+        or evaluation.get("question_id")
+        or user_answer.get("question_id")
+        or row.get("question_template_id")
+        or ""
+    )
 
     return {
-        "question_id": str(evaluation.get("question_id") or row.get("question_template_id") or ""),
+        "question_id": question_id,
         "question_template_id": str(row.get("question_template_id") or ""),
         "question_type": str(row.get("question_type") or ""),
         "is_correct": bool(row.get("is_correct", False)),

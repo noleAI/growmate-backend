@@ -765,7 +765,11 @@ class AgenticOrchestrator:
                     },
                     "required": ["session_id"],
                 },
-                handler=partial(get_student_history, memory_store=self.memory_store),
+                handler=partial(
+                    get_student_history,
+                    memory_store=self.memory_store,
+                    state_manager=self.state_mgr,
+                ),
             )
         )
 

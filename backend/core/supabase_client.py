@@ -987,20 +987,24 @@ async def upsert_user_profile(
 async def list_recent_episodic_memory(
     session_id: str,
     limit: int = 5,
+    student_id: str | None = None,
     access_token: str | None = None,
 ) -> list[Dict[str, Any]]:
     safe_limit = max(1, int(limit or 1))
+    normalized_student_id = str(student_id or "").strip()
 
     def _select():
-        return (
+        query = (
             get_supabase_client(access_token)
             .table("episodic_memory")
             .select("id,student_id,session_id,state,action,outcome,reward,created_at")
             .eq("session_id", session_id)
             .order("created_at", desc=True)
             .limit(safe_limit)
-            .execute()
         )
+        if normalized_student_id:
+            query = query.eq("student_id", normalized_student_id)
+        return query.execute()
 
     response = await _run_with_retry("list_recent_episodic_memory", _select)
     rows = getattr(response, "data", []) or []

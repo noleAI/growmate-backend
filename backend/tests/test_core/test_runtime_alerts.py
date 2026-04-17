@@ -1,3 +1,4 @@
+import urllib.error
 import urllib.request
 
 from core.runtime_alerts import (
@@ -96,3 +97,41 @@ def test_dispatch_runtime_alerts_applies_rate_limit(monkeypatch) -> None:
     assert second["sent"] == 0
     assert second["skipped_rate_limited"] == 1
     assert len(sent_calls) == 1
+
+
+def test_dispatch_runtime_alerts_does_not_rate_limit_failed_deliveries(monkeypatch) -> None:
+    reset_runtime_alert_state()
+    monkeypatch.setenv("RUNTIME_ALERT_MIN_INTERVAL_SECONDS", "999")
+
+    def _urlopen_fail(request, timeout=0):
+        del request, timeout
+        raise urllib.error.URLError("network down")
+
+    monkeypatch.setattr(urllib.request, "urlopen", _urlopen_fail)
+
+    alerts = [
+        {
+            "name": "runtime_metric_signature_expired_total",
+            "metric": "signature_expired_total",
+            "value": 10,
+            "threshold": 2,
+        }
+    ]
+
+    first = dispatch_runtime_alerts(
+        alerts,
+        metrics={"signature_expired_total": 10},
+        webhook_url="https://example.com/alert",
+    )
+    second = dispatch_runtime_alerts(
+        alerts,
+        metrics={"signature_expired_total": 10},
+        webhook_url="https://example.com/alert",
+    )
+
+    assert first["attempted"] == 1
+    assert first["failed"] == 1
+    assert first["skipped_rate_limited"] == 0
+    assert second["attempted"] == 1
+    assert second["failed"] == 1
+    assert second["skipped_rate_limited"] == 0

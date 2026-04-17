@@ -80,15 +80,23 @@ def _parse_snapshot(row: dict[str, Any] | None) -> dict[str, Any]:
 
 def _sanitize_attempt(attempt: dict[str, Any]) -> dict[str, Any]:
     evaluation = attempt.get("evaluation") if isinstance(attempt.get("evaluation"), dict) else {}
+    user_answer = attempt.get("user_answer") if isinstance(attempt.get("user_answer"), dict) else {}
+    question_id = str(
+        attempt.get("question_id")
+        or evaluation.get("question_id")
+        or user_answer.get("question_id")
+        or attempt.get("question_template_id")
+        or ""
+    )
     return {
-        "question_id": str(attempt.get("question_id") or ""),
+        "question_id": question_id,
         "question_template_id": str(attempt.get("question_template_id") or ""),
         "question_type": str(attempt.get("question_type") or ""),
         "is_correct": bool(attempt.get("is_correct", False)),
         "score": float(attempt.get("score") or 0.0),
         "max_score": float(attempt.get("max_score") or 0.0),
         "explanation": str(evaluation.get("explanation") or attempt.get("explanation") or ""),
-        "user_answer": attempt.get("user_answer") if isinstance(attempt.get("user_answer"), dict) else {},
+        "user_answer": user_answer,
         "submitted_at": attempt.get("submitted_at"),
         "time_taken_sec": attempt.get("time_taken_sec"),
     }
@@ -339,14 +347,20 @@ async def submit_quiz_answer(
 
     question_template_id = str(result.get("question_template_id") or "").strip()
     if question_template_id:
+        persisted_user_answer = dict(attempt["user_answer"])
+        persisted_user_answer.setdefault("question_id", str(payload.question_id))
+
+        persisted_evaluation = dict(attempt["evaluation"])
+        persisted_evaluation.setdefault("question_id", str(payload.question_id))
+
         try:
             await insert_quiz_question_attempt(
                 student_id=user_id,
                 session_id=payload.session_id,
                 question_template_id=question_template_id,
                 question_type=str(result.get("question_type") or ""),
-                user_answer=attempt["user_answer"],
-                evaluation=attempt["evaluation"],
+                user_answer=persisted_user_answer,
+                evaluation=persisted_evaluation,
                 score=float(result.get("score") or 0.0),
                 max_score=float(result.get("max_score") or 0.0),
                 is_correct=bool(result.get("is_correct", False)),

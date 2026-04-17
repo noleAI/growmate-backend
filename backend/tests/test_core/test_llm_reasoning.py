@@ -228,3 +228,63 @@ async def test_run_agentic_reasoning_tool_timeout(monkeypatch: pytest.MonkeyPatc
 
     assert result["fallback"] is True
     assert "tool timeout" in result["reasoning"].lower()
+
+
+@pytest.mark.asyncio
+async def test_run_agentic_reasoning_overrides_model_session_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service_with_no_model(monkeypatch)
+
+    class _SequentialModel:
+        def __init__(self):
+            self.calls = 0
+
+        def generate_content(self, *args, **kwargs):
+            del args, kwargs
+            self.calls += 1
+            if self.calls == 1:
+                return SimpleNamespace(
+                    function_calls=[
+                        _FunctionCall(
+                            "echo_session",
+                            {"session_id": "attacker-session"},
+                        )
+                    ],
+                    candidates=[],
+                    text="",
+                )
+            return SimpleNamespace(function_calls=[], candidates=[], text='{"action": "next_question"}')
+
+    service.model = _SequentialModel()
+    captured_args: dict[str, object] = {}
+
+    async def _echo_session(**kwargs):
+        captured_args.update(kwargs)
+        return {"ok": True}
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="echo_session",
+            description="Echo session id",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                },
+                "required": ["session_id"],
+            },
+            handler=_echo_session,
+        )
+    )
+
+    result = await service.run_agentic_reasoning(
+        session_id="trusted-session",
+        student_input={"question_text": "Q"},
+        tool_registry=registry,
+        max_steps=3,
+    )
+
+    assert captured_args.get("session_id") == "trusted-session"
+    assert result["action"] == "next_question"

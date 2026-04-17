@@ -178,6 +178,53 @@ async def test_get_quiz_result_uses_snapshot_data() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_quiz_result_fallback_attempt_restores_question_id() -> None:
+    async def _session_stub(**kwargs):
+        del kwargs
+        return {
+            "id": "sess-result-2",
+            "status": "completed",
+            "last_question_index": 1,
+            "total_questions": 5,
+            "progress_percent": 20,
+            "start_time": "2026-04-17T10:00:00+00:00",
+            "end_time": "2026-04-17T10:02:00+00:00",
+            "state_snapshot": {"quiz_state": {"summary": {}, "attempts": []}},
+        }
+
+    async def _attempts_stub(**kwargs):
+        del kwargs
+        return [
+            {
+                "question_template_id": "template-legacy",
+                "question_type": "MULTIPLE_CHOICE",
+                "is_correct": False,
+                "score": 0.0,
+                "max_score": 1.0,
+                "evaluation": {
+                    "explanation": "review",
+                    "question_id": "MATH_DERIV_1",
+                },
+                "user_answer": {"selected_option": "A"},
+                "submitted_at": "2026-04-17T10:01:00+00:00",
+            }
+        ]
+
+    quiz_route.get_learning_session_by_id = _session_stub
+    quiz_route.list_quiz_question_attempts = _attempts_stub
+
+    result = await quiz_route.get_quiz_result(
+        session_id="sess-result-2",
+        user={"sub": "student-1"},
+        access_token="token",
+    )
+
+    assert result["status"] == "ok"
+    assert len(result["attempts"]) == 1
+    assert result["attempts"][0]["question_id"] == "MATH_DERIV_1"
+
+
+@pytest.mark.asyncio
 async def test_get_quiz_history_returns_session_summaries() -> None:
     async def _history_stub(**kwargs):
         assert kwargs["student_id"] == "student-1"

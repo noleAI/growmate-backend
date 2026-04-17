@@ -23,9 +23,9 @@ Use this runbook when agentic reasoning causes degraded behavior, elevated laten
 
 ## Suggested Validation Commands
 - Health check from backend root:
-  - `/home/pbkhang404/Documents/growmate-backend/backend/.venv/bin/python -m pytest backend/tests/test_orchestrator/test_phase3_behaviors.py backend/tests/test_orchestrator/test_data_driven_payload.py`
+  - `python -m pytest tests/test_orchestrator/test_phase3_behaviors.py tests/test_orchestrator/test_data_driven_payload.py`
 - Agentic fallback checks:
-  - `/home/pbkhang404/Documents/growmate-backend/backend/.venv/bin/python -m pytest backend/tests/test_orchestrator/test_agentic_mode.py`
+  - `python -m pytest tests/test_orchestrator/test_agentic_mode.py`
 
 ## Roll Forward Procedure
 1. Investigate logs for timeout/tool errors.

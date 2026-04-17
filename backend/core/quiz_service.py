@@ -98,16 +98,13 @@ class QuizService:
         if cached:
             return cached
 
-        random_state = random.getstate()
-        random.seed(f"{session_id}:{mode}:{int(total_questions or 0)}")
-        try:
-            selected = select_quiz_questions_for_mode(
-                question_pool=self._questions,
-                mode=mode,
-                num_questions=total_questions,
-            )
-        finally:
-            random.setstate(random_state)
+        seeded_rng = random.Random(f"{session_id}:{mode}:{int(total_questions or 0)}")
+        selected = select_quiz_questions_for_mode(
+            question_pool=self._questions,
+            mode=mode,
+            num_questions=total_questions,
+            rng=seeded_rng,
+        )
 
         question_ids = [
             str(item.get("question_id") or "").strip()

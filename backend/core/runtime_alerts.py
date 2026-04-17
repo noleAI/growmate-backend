@@ -139,8 +139,12 @@ def _allow_dispatch(alert_name: str, now: float, min_interval_sec: int) -> bool:
         last_sent = _last_sent_at.get(alert_name)
         if last_sent is not None and (now - last_sent) < min_interval_sec:
             return False
-        _last_sent_at[alert_name] = now
     return True
+
+
+def _mark_dispatched(alert_name: str, timestamp: float) -> None:
+    with _alert_lock:
+        _last_sent_at[alert_name] = timestamp
 
 
 def reset_runtime_alert_state() -> None:
@@ -205,6 +209,7 @@ def dispatch_runtime_alerts(
                 status_code = int(getattr(response, "status", 200) or 200)
                 if 200 <= status_code < 300:
                     result["sent"] += 1
+                    _mark_dispatched(alert_name, now)
                 else:
                     result["failed"] += 1
         except (urllib.error.URLError, TimeoutError, ValueError):

@@ -160,10 +160,29 @@ async def get_strategy_suggestion(
 
 async def get_student_history(
     memory_store: MemoryStore,
+    state_manager: StateManager,
     session_id: str,
     n: int = 5,
 ) -> dict[str, Any]:
-    episodes = await memory_store.get_recent_episodes(session_id, limit=max(1, int(n)))
+    context_map = getattr(state_manager, "session_context", {})
+    context = context_map.get(session_id, {}) if isinstance(context_map, dict) else {}
+    student_id = str(context.get("student_id") or "").strip() or None
+    access_token = str(context.get("access_token") or "").strip() or None
+
+    if not student_id:
+        return {
+            "history": [],
+            "total": 0,
+            "accuracy": 0.0,
+            "interpretation": "No authenticated student context available.",
+        }
+
+    episodes = await memory_store.get_recent_episodes(
+        session_id,
+        limit=max(1, int(n)),
+        student_id=student_id,
+        access_token=access_token,
+    )
     if not episodes:
         return {
             "history": [],

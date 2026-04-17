@@ -155,12 +155,14 @@ class MemoryStore:
         self,
         session_id: str,
         limit: int = 5,
+        student_id: Optional[str] = None,
         access_token: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         try:
             return await list_recent_episodic_memory(
                 session_id=session_id,
                 limit=limit,
+                student_id=student_id,
                 access_token=access_token,
             )
         except Exception as exc:  # noqa: BLE001

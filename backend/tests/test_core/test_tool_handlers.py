@@ -19,6 +19,7 @@ from core.tool_handlers import (
 class _StateManagerStub:
     def __init__(self, state: SessionState):
         self._state = state
+        self.session_context: dict[str, dict[str, str]] = {}
 
     async def load_or_init(self, session_id: str) -> SessionState:
         del session_id
@@ -33,8 +34,10 @@ class _MemoryStoreStub:
         self,
         session_id: str,
         limit: int = 5,
+        student_id: str | None = None,
+        access_token: str | None = None,
     ) -> list[dict[str, Any]]:
-        del session_id
+        del session_id, student_id, access_token
         return self._episodes[:limit]
 
 
@@ -161,11 +164,37 @@ async def test_get_student_history_accuracy() -> None:
         {"action": "drill_practice", "outcome": {"is_correct": True}},
     ]
 
-    result = await get_student_history(_MemoryStoreStub(episodes), "s1", n=3)
+    state_manager = _StateManagerStub(SessionState(session_id="s1"))
+    state_manager.session_context["s1"] = {
+        "student_id": "student-1",
+        "access_token": "token",
+    }
+
+    result = await get_student_history(
+        _MemoryStoreStub(episodes),
+        state_manager,
+        "s1",
+        n=3,
+    )
 
     assert result["total"] == 3
     assert result["accuracy"] == 0.67
     assert "Recent accuracy=67%" in result["interpretation"]
+
+
+@pytest.mark.asyncio
+async def test_get_student_history_without_student_context() -> None:
+    state_manager = _StateManagerStub(SessionState(session_id="s1"))
+
+    result = await get_student_history(
+        _MemoryStoreStub([{"action": "next_question", "outcome": {"is_correct": True}}]),
+        state_manager,
+        "s1",
+        n=3,
+    )
+
+    assert result["total"] == 0
+    assert result["history"] == []
 
 
 @pytest.mark.asyncio

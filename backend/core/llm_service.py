@@ -262,8 +262,10 @@ Hãy trả về JSON với đúng 2 key:
                 )
                 return self._agentic_fallback(f"Unknown tool: {tool_name}", reasoning_trace)
 
+            tool_args = dict(tool_args)
             if self._tool_requires_session_id(tool_registry, tool_name):
-                tool_args.setdefault("session_id", session_id)
+                # Never trust model-supplied session ids; enforce current session context.
+                tool_args["session_id"] = session_id
 
             try:
                 tool_result = await asyncio.wait_for(
