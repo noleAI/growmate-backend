@@ -111,3 +111,49 @@ Manages the abstraction layer's payload (KG, Prior parameters).
 
 ### Latency Optimization (Flutter Mobile)
 - To ensure p95 < 3s, the API merges multiple smaller calls. For example, `POST /interact` returns *both* the diagnosis result and the next immediately actionable step defined by the HTN Planner, mitigating round-trip delays over potentially slow mobile networks.
+
+---
+
+## 4. Agentic Step Response (Optional Fields)
+
+Endpoint: `POST /api/v1/orchestrator/step`
+
+The response is backward-compatible. Existing fields remain unchanged. The fields below are optional and appear when agentic reasoning is enabled or when metadata is available.
+
+### Optional reasoning fields
+- `reasoning_mode`: `"adaptive" | "agentic"`
+- `reasoning_trace`: list of tool-call steps used by the decision process
+- `reasoning_content`: short textual rationale for the chosen action
+- `reasoning_confidence`: floating-point confidence score in range `[0.0, 1.0]`
+
+### Optional observability fields
+- `llm_steps`: number of LLM reasoning iterations in the current decision
+- `tool_count`: number of tools called during the current decision
+- `fallback_used`: whether agentic flow fell back before finalizing output
+
+### Example
+```json
+{
+    "action": "show_hint",
+    "payload": {
+        "text": "Hay thu tach bai toan thanh 2 buoc nho.",
+        "fallback_used": false
+    },
+    "dashboard_update": {},
+    "reasoning_mode": "agentic",
+    "reasoning_trace": [
+        {
+            "step": 1,
+            "tool": "get_academic_beliefs",
+            "args": {"session_id": "sess_123"},
+            "result_summary": "Top weakness: Quy tac chain rule"
+        }
+    ],
+    "reasoning_content": "Entropy cao va confusion tang nen uu tien hint.",
+    "reasoning_confidence": 0.82,
+    "llm_steps": 2,
+    "tool_count": 1,
+    "fallback_used": false,
+    "latency_ms": 820
+}
+```

@@ -838,3 +838,103 @@ async def upsert_user_profile(
         **_default_user_profile(user_id),
         **payload,
     }
+
+
+async def list_recent_episodic_memory(
+    session_id: str,
+    limit: int = 5,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    safe_limit = max(1, int(limit or 1))
+
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("episodic_memory")
+            .select("id,student_id,session_id,state,action,outcome,reward,created_at")
+            .eq("session_id", session_id)
+            .order("created_at", desc=True)
+            .limit(safe_limit)
+            .execute()
+        )
+
+    response = await _run_with_retry("list_recent_episodic_memory", _select)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def insert_reasoning_trace(
+    session_id: str,
+    step: int,
+    reasoning_mode: str,
+    tools_called: list[Dict[str, Any]],
+    reasoning_text: str,
+    final_action: str,
+    confidence: float,
+    latency_ms: int,
+    fallback_used: bool = False,
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "session_id": session_id,
+        "student_id": student_id,
+        "step": int(step),
+        "reasoning_mode": reasoning_mode,
+        "tools_called": tools_called,
+        "reasoning_text": reasoning_text,
+        "final_action": final_action,
+        "confidence": float(confidence),
+        "latency_ms": int(latency_ms),
+        "fallback_used": bool(fallback_used),
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("reasoning_traces")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("insert_reasoning_trace", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }
+
+
+async def insert_reflection(
+    session_id: str,
+    step: int,
+    reflection: Dict[str, Any],
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "session_id": session_id,
+        "student_id": student_id,
+        "step": int(step),
+        "effectiveness": reflection.get("effectiveness"),
+        "entropy_trend": reflection.get("entropy_trend"),
+        "accuracy_trend": reflection.get("accuracy_trend"),
+        "emotion_trend": reflection.get("emotion_trend"),
+        "should_change": bool(reflection.get("should_change_strategy", False)),
+        "recommendation": reflection.get("recommendation"),
+        "priority_action": reflection.get("priority_action"),
+        "reasoning": reflection.get("reasoning"),
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("session_reflections")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("insert_reflection", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }

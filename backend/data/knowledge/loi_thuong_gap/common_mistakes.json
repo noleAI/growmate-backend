@@ -1,0 +1,17 @@
+[
+  {
+    "chapter": "dao_ham",
+    "section": "chain_rule_missed_inner",
+    "content": "Loi thuong gap: Quen nhan dao ham lop trong khi dung chain rule. Cach sua: viet ro u = g(x), sau do nhan them u'."
+  },
+  {
+    "chapter": "dao_ham",
+    "section": "trig_sign_error",
+    "content": "Loi thuong gap: Viet sai dau cua (cos x)' thanh +sin x. Nho rang (cos x)' = -sin x."
+  },
+  {
+    "chapter": "dao_ham",
+    "section": "quotient_rule_parentheses",
+    "content": "Loi thuong gap: Thieu ngoac o tu so trong quy tac thuong. Cach sua: viet day du (u'v - uv')/v^2 truoc khi rut gon."
+  }
+]

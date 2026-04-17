@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     # Internal thresholds
     hitl_uncertainty_threshold: float = 0.75
     exhaustion_threshold: float = 0.80
+    orchestrator_max_sessions: int = 1024
+
+    # Agentic reasoning
+    use_llm_reasoning: bool = False
+    agentic_max_steps: int = 5
+    agentic_timeout_ms: int = 8000
+    agentic_fallback: str = "adaptive"
+
+    # RAG
+    embedding_model: str = "text-embedding-004"
+
+    # Reflection
+    reflection_interval: int = 5
+    reflection_enabled: bool = True
 
     # Ignore unknown env keys for forward-compatibility (e.g., future GCP/LLM vars).
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
