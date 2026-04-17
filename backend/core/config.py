@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     quiz_daily_session_limit: int = 5
     quiz_hmac_secret: str | None = None
     quiz_signature_ttl_seconds: int = 300
+    quiz_signature_resume_grace_seconds: int = 1800
 
     # Internal thresholds
     hitl_uncertainty_threshold: float = 0.75
@@ -32,6 +33,13 @@ class Settings(BaseSettings):
     # Reflection
     reflection_interval: int = 5
     reflection_enabled: bool = True
+
+    # Runtime alerting
+    runtime_alert_webhook_url: str | None = None
+    runtime_alert_min_interval_seconds: int = 300
+    runtime_alert_signature_expired_threshold: int = 20
+    runtime_alert_result_fetch_failure_threshold: int = 10
+    runtime_alert_resume_grace_usage_threshold: int = 15
 
     # Ignore unknown env keys for forward-compatibility (e.g., future GCP/LLM vars).
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

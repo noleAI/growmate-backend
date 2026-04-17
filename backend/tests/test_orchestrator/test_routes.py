@@ -106,6 +106,7 @@ async def test_session_interact_uses_orchestrator(monkeypatch) -> None:
         lambda session_id=None: stub,
     )
     monkeypatch.setattr(session_route, "can_play", _can_play_stub)
+    monkeypatch.setattr(session_route, "_resolve_signature_config", lambda: (None, 300))
 
     response = await session_route.interact(
         http_request=_RequestStub(),
@@ -147,6 +148,7 @@ async def test_session_interact_returns_403_when_no_lives(monkeypatch) -> None:
     )
     monkeypatch.setattr(session_route, "can_play", _can_play_stub)
     monkeypatch.setattr(session_route, "check_regen", _check_regen_stub)
+    monkeypatch.setattr(session_route, "_resolve_signature_config", lambda: (None, 300))
 
     response = await session_route.interact(
         http_request=_RequestStub(),

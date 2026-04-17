@@ -7,7 +7,10 @@ from typing import Any, Dict
 from supabase import create_client
 
 from agents.base import SessionState
-from core.supabase_client import update_learning_session_progress
+from core.supabase_client import (
+    get_learning_session_by_id,
+    update_learning_session_progress,
+)
 
 logger = logging.getLogger("core.state_manager")
 
@@ -26,13 +29,177 @@ class StateManager:
         self._sync_locks: Dict[str, asyncio.Lock] = {}
 
     async def load_or_init(self, session_id: str) -> SessionState:
-        if session_id not in self.cache:
-            # TODO: Ưu tiên load từ cache, nếu miss thì query Supabase
-            self.cache[session_id] = SessionState(session_id=session_id)
-            self.sync_counter[session_id] = 0
-            self.last_sync_at[session_id] = datetime.now(UTC)
-            self._start_autosave_task(session_id)
+        if session_id in self.cache:
+            logger.debug("Session state cache hit session_id=%s", session_id)
+            return self.cache[session_id]
+
+        restored = await self._load_state_from_snapshot(session_id)
+        self.cache[session_id] = restored or SessionState(session_id=session_id)
+        if restored is not None:
+            logger.info(
+                "Session state loaded source=snapshot session_id=%s step=%s last_question_index=%s progress_percent=%s",
+                session_id,
+                int(self.cache[session_id].step or 0),
+                int(self.cache[session_id].strategy_state.get("last_question_index", 0) or 0),
+                int(self.cache[session_id].strategy_state.get("progress_percent", 0) or 0),
+            )
+        else:
+            logger.info("Session state loaded source=fresh session_id=%s", session_id)
+
+        self.sync_counter[session_id] = 0
+        self.last_sync_at[session_id] = datetime.now(UTC)
+
+        self._start_autosave_task(session_id)
         return self.cache[session_id]
+
+    async def _load_state_from_snapshot(self, session_id: str) -> SessionState | None:
+        context = self.session_context.get(session_id, {})
+        student_id = str(context.get("student_id") or "").strip() or None
+        access_token = str(context.get("access_token") or "").strip() or None
+
+        try:
+            row = await get_learning_session_by_id(
+                session_id=session_id,
+                student_id=student_id,
+                access_token=access_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to rehydrate session=%s from snapshot: %s",
+                session_id,
+                exc,
+            )
+            return None
+
+        if not isinstance(row, dict):
+            return None
+
+        snapshot = row.get("state_snapshot")
+        if not isinstance(snapshot, dict):
+            snapshot = {}
+
+        state = SessionState(session_id=session_id)
+
+        academic_state = snapshot.get("academic_state")
+        if isinstance(academic_state, dict):
+            state.academic_state = academic_state
+
+        empathy_state = snapshot.get("empathy_state")
+        if isinstance(empathy_state, dict):
+            state.empathy_state = empathy_state
+
+        strategy_state = snapshot.get("strategy_state")
+        if isinstance(strategy_state, dict):
+            state.strategy_state = dict(strategy_state)
+        else:
+            state.strategy_state = {}
+
+        persisted_total = self._safe_int(
+            row.get("total_questions"),
+            default=self._safe_int(state.strategy_state.get("total_questions"), default=10),
+        )
+        if persisted_total <= 0:
+            persisted_total = 10
+
+        persisted_index = self._safe_int(
+            row.get("last_question_index"),
+            default=self._safe_int(
+                state.strategy_state.get("last_question_index"),
+                default=self._safe_int(state.strategy_state.get("current_question_index"), default=0),
+            ),
+        )
+        persisted_index = max(0, min(persisted_total, persisted_index))
+
+        persisted_progress = self._safe_int(
+            row.get("progress_percent"),
+            default=self._safe_int(
+                state.strategy_state.get("progress_percent"),
+                default=int(round((persisted_index / max(1, persisted_total)) * 100)),
+            ),
+        )
+        persisted_progress = max(0, min(100, persisted_progress))
+
+        state.strategy_state["total_questions"] = persisted_total
+        state.strategy_state["last_question_index"] = persisted_index
+        state.strategy_state["progress_percent"] = persisted_progress
+
+        restored_step = self._safe_int(snapshot.get("step"), default=persisted_index)
+        state.step = max(0, max(restored_step, persisted_index))
+
+        restored_mode = str(
+            snapshot.get("mode")
+            or state.strategy_state.get("mode")
+            or "normal"
+        ).strip()
+        state.mode = restored_mode or "normal"
+        state.strategy_state["mode"] = state.mode
+
+        state.user_classification_level = str(
+            snapshot.get("user_classification_level")
+            or state.strategy_state.get("classification_level")
+            or "intermediate"
+        ).strip() or "intermediate"
+        state.strategy_state["classification_level"] = state.user_classification_level
+
+        state.pause_state = bool(snapshot.get("pause_state", False))
+        pause_reason = snapshot.get("pause_reason")
+        state.pause_reason = str(pause_reason).strip() if pause_reason else None
+        pause_ts = snapshot.get("pause_timestamp")
+        state.pause_timestamp = str(pause_ts).strip() if pause_ts else None
+        state.off_topic_counter = max(
+            0,
+            self._safe_int(snapshot.get("off_topic_counter"), default=0),
+        )
+        state.hitl_pending = bool(snapshot.get("hitl_pending", False))
+
+        signal_history = snapshot.get("signal_history")
+        if isinstance(signal_history, list):
+            state.signal_history = [item for item in signal_history if isinstance(item, dict)][-5:]
+        last_signal_time = snapshot.get("last_signal_time")
+        if last_signal_time:
+            state.last_signal_time = str(last_signal_time)
+
+        interaction_time = self._parse_datetime(
+            row.get("last_interaction_at")
+            or state.strategy_state.get("last_interaction_at")
+        )
+        state.last_interaction_timestamp = interaction_time
+        if interaction_time is not None:
+            state.strategy_state["last_interaction_at"] = interaction_time.isoformat()
+
+        if student_id:
+            state.strategy_state["student_id"] = student_id
+
+        return state
+
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return int(default)
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+
+        if isinstance(value, datetime):
+            return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+        if isinstance(value, str):
+            normalized = value.strip()
+            if not normalized:
+                return None
+            if normalized.endswith("Z"):
+                normalized = normalized[:-1] + "+00:00"
+            try:
+                parsed = datetime.fromisoformat(normalized)
+            except ValueError:
+                return None
+            return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+        return None
 
     def register_session_context(
         self,

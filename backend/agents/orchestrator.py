@@ -199,7 +199,6 @@ class AgenticOrchestrator:
     ) -> Dict[str, Any]:
         """Luồng xử lý chính cho mỗi bước tương tác"""
         start_time = time.time()
-        state = await self.state_mgr.load_or_init(session_id)
         student_id = payload.get("student_id")
         access_token_raw = payload.get("access_token")
         access_token = access_token_raw if isinstance(access_token_raw, str) else None
@@ -211,6 +210,8 @@ class AgenticOrchestrator:
                 student_id=student_id,
                 access_token=access_token,
             )
+
+        state = await self.state_mgr.load_or_init(session_id)
 
         mode = str(payload.get("mode") or state.mode or state.strategy_state.get("mode", "normal"))
         classification_level = payload.get("classification_level")
@@ -229,7 +230,8 @@ class AgenticOrchestrator:
         state.strategy_state["classification_level"] = classification_level
         state.strategy_state["student_id"] = str(student_id or "").strip()
 
-        if bool(payload.get("resume", False)):
+        resume_requested = bool(payload.get("resume", False))
+        if resume_requested:
             state.pause_state = False
             state.pause_reason = None
             state.pause_timestamp = None
@@ -330,7 +332,9 @@ class AgenticOrchestrator:
 
         spam_detected = bool(state.empathy_state.get("spam_detected", False))
         afk_detected = bool(state.empathy_state.get("afk_detected", False))
+        pause_transition = False
         if spam_detected or afk_detected:
+            pause_transition = not state.pause_state
             state.pause_state = True
             state.pause_reason = "spam" if spam_detected else "afk"
             state.pause_timestamp = datetime.now(UTC).isoformat()
@@ -630,8 +634,29 @@ class AgenticOrchestrator:
             dashboard_payload["data_driven"] = data_driven_payload
         await self.state_mgr.broadcast_ws(session_id, dashboard_payload)
 
-        # 8. Async Sync & Return
-        asyncio.create_task(self.state_mgr.sync_to_supabase(session_id, state))
+        # 8. Sync & Return
+        action_type = str(payload.get("action_type") or "").strip().lower()
+        force_sync_reason = ""
+        if action_type in {"submit_quiz", "submit_answer"}:
+            force_sync_reason = "quiz_submit"
+        elif pause_transition:
+            force_sync_reason = "pause_transition"
+        elif resume_requested:
+            force_sync_reason = "resume_transition"
+
+        if force_sync_reason:
+            try:
+                await self.state_mgr.sync_to_supabase(
+                    session_id,
+                    state,
+                    force=True,
+                    reason=force_sync_reason,
+                )
+            except TypeError:
+                # Backward compatibility for test stubs or legacy state managers.
+                await self.state_mgr.sync_to_supabase(session_id, state)
+        else:
+            asyncio.create_task(self.state_mgr.sync_to_supabase(session_id, state))
 
         return {
             "action": final_action,
