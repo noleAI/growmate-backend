@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import logging
 import uuid
@@ -13,6 +14,8 @@ from core.config import get_settings
 from core.learning_mode import normalize_learning_mode
 from core.lives_engine import can_play, check_regen
 from core.memory_store import memory_store
+from core.runtime_alerts import maybe_emit_runtime_alerts
+from core.runtime_metrics import increment_metric
 from core.security import (
     get_bearer_token,
     get_current_user,
@@ -23,6 +26,7 @@ from core.supabase_client import (
     get_latest_active_learning_session,
     insert_learning_session,
     update_learning_session,
+    update_learning_session_progress,
 )
 from core.user_classifier import classify
 from models.requests import (
@@ -31,8 +35,6 @@ from models.requests import (
     UpdateSessionRequest,
 )
 from models.responses import InteractionResponse, SessionResponse
-
-# TODO: from agents.orchestrator import orchestrator
 
 router = APIRouter()
 logger = logging.getLogger("api.session")
@@ -66,6 +68,62 @@ def _resolve_signature_config() -> tuple[str | None, int]:
         return None, 300
 
 
+def _resolve_signature_resume_grace_seconds() -> int:
+    try:
+        return int(max(1, get_settings().quiz_signature_resume_grace_seconds))
+    except Exception:
+        return 1800
+
+
+async def _verify_signature_with_resume_grace(
+    *,
+    http_request: Request,
+    secret: str | None,
+    ttl_seconds: int,
+    resume_requested: bool,
+    session_id: str,
+    action_type: str,
+) -> str:
+    try:
+        await verify_quiz_signature(
+            http_request,
+            secret=secret,
+            ttl_seconds=ttl_seconds,
+        )
+        return "default"
+    except HTTPException as exc:
+        is_expired = (
+            exc.status_code == status.HTTP_401_UNAUTHORIZED
+            and str(exc.detail) == "signature_expired"
+        )
+        if is_expired:
+            increment_metric("signature_expired_total")
+            asyncio.create_task(
+                maybe_emit_runtime_alerts(trigger="signature_expired")
+            )
+        if not (resume_requested and is_expired):
+            raise
+
+        resume_grace_ttl = max(ttl_seconds, _resolve_signature_resume_grace_seconds())
+        if resume_grace_ttl <= ttl_seconds:
+            raise
+
+        logger.info(
+            "Applying signature resume grace session_id=%s action_type=%s base_ttl=%s grace_ttl=%s",
+            session_id,
+            action_type,
+            ttl_seconds,
+            resume_grace_ttl,
+        )
+        await verify_quiz_signature(
+            http_request,
+            secret=secret,
+            ttl_seconds=resume_grace_ttl,
+        )
+        increment_metric("resume_signature_grace_used_total")
+        return "resume_grace"
+
+
 def _build_pending_session_payload(row: dict) -> dict:
     total_questions = int(row.get("total_questions", 10) or 10)
     if total_questions <= 0:
@@ -84,12 +142,38 @@ def _build_pending_session_payload(row: dict) -> dict:
         progress_percent = int(progress_percent or 0)
     progress_percent = max(0, min(100, progress_percent))
 
+    snapshot = row.get("state_snapshot")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+
+    strategy_state = snapshot.get("strategy_state")
+    if not isinstance(strategy_state, dict):
+        strategy_state = {}
+
+    mode = str(
+        snapshot.get("mode")
+        or strategy_state.get("mode")
+        or "explore"
+    ).strip() or "explore"
+
+    pause_state = bool(snapshot.get("pause_state", False))
+    pause_reason = snapshot.get("pause_reason")
+    if pause_reason is not None:
+        pause_reason = str(pause_reason).strip() or None
+
+    next_question_index = min(total_questions, max(0, last_question_index))
+
     return {
         "session_id": str(row.get("id", "")),
         "status": str(row.get("status") or "active"),
         "last_question_index": last_question_index,
+        "next_question_index": next_question_index,
         "total_questions": total_questions,
         "progress_percent": progress_percent,
+        "mode": mode,
+        "pause_state": pause_state,
+        "pause_reason": pause_reason,
+        "resume_context_version": 1,
         "last_active_at": row.get("last_interaction_at") or row.get("start_time"),
         "abandoned_at": row.get("end_time"),
     }
@@ -101,9 +185,63 @@ async def create_session(
     user: dict = current_user_dependency,
     access_token: str = Depends(get_bearer_token),
 ):
-    session_id = str(uuid.uuid4())
     student_id = str(user.get("sub", ""))
     mode = _normalize_mode_or_400(request.mode)
+
+    if student_id:
+        try:
+            pending_row = await get_latest_active_learning_session(
+                student_id=student_id,
+                access_token=access_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to check pending session for student_id=%s before create: %s",
+                student_id,
+                exc,
+            )
+            pending_row = None
+
+        if isinstance(pending_row, dict) and pending_row.get("id"):
+            existing_session_id = str(pending_row.get("id")).strip()
+            existing_state = memory_store.get_session_state(existing_session_id)
+            snapshot = pending_row.get("state_snapshot")
+            if not isinstance(snapshot, dict):
+                snapshot = {}
+            snapshot_strategy = snapshot.get("strategy_state")
+            if not isinstance(snapshot_strategy, dict):
+                snapshot_strategy = {}
+
+            initial_state = existing_state or {
+                "subject": request.subject,
+                "topic": request.topic,
+                "beliefs": copy.deepcopy(bayesian_tracker.beliefs),
+                "student_id": student_id,
+                "classification_level": str(
+                    snapshot.get("user_classification_level")
+                    or snapshot_strategy.get("classification_level")
+                    or request.classification_level
+                    or "intermediate"
+                ),
+                "mode": str(
+                    snapshot.get("mode")
+                    or snapshot_strategy.get("mode")
+                    or mode
+                ),
+            }
+            memory_store.save_session_state(existing_session_id, initial_state)
+
+            return SessionResponse(
+                session_id=existing_session_id,
+                status=str(pending_row.get("status") or "active"),
+                start_time=str(
+                    pending_row.get("start_time")
+                    or datetime.now(UTC).isoformat()
+                ),
+                initial_state=initial_state,
+            )
+
+    session_id = str(uuid.uuid4())
 
     daily_limit = _resolve_quiz_daily_limit()
     if student_id:
@@ -159,6 +297,49 @@ async def create_session(
         "mode": mode,
     }
     memory_store.save_session_state(session_id, state)
+
+    if student_id:
+        initial_snapshot = {
+            "step": 0,
+            "mode": mode,
+            "user_classification_level": classification_level,
+            "pause_state": False,
+            "pause_reason": None,
+            "off_topic_counter": 0,
+            "hitl_pending": False,
+            "subject": request.subject,
+            "topic": request.topic,
+            "strategy_state": {
+                "mode": mode,
+                "classification_level": classification_level,
+                "student_id": student_id,
+                "total_questions": 10,
+                "last_question_index": 0,
+                "progress_percent": 0,
+            },
+            "academic_state": {
+                "belief_dist": copy.deepcopy(bayesian_tracker.beliefs),
+            },
+            "empathy_state": {},
+        }
+        try:
+            await update_learning_session_progress(
+                session_id=session_id,
+                student_id=student_id,
+                last_question_index=0,
+                total_questions=10,
+                progress_percent=0,
+                last_interaction_at=datetime.now(UTC),
+                state_snapshot=initial_snapshot,
+                access_token=access_token,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to persist initial session snapshot for session_id=%s student_id=%s: %s",
+                session_id,
+                student_id,
+                exc,
+            )
 
     return SessionResponse(
         session_id=session_id,
@@ -296,10 +477,25 @@ async def interact(
     effective_mode = _normalize_mode_or_400(request.mode)
     if action_type in QUIZ_LIFE_ACTIONS:
         secret, ttl = _resolve_signature_config()
-        await verify_quiz_signature(http_request, secret=secret, ttl_seconds=ttl)
+        signature_mode = await _verify_signature_with_resume_grace(
+            http_request=http_request,
+            secret=secret,
+            ttl_seconds=ttl,
+            resume_requested=bool(request.resume),
+            session_id=session_id,
+            action_type=action_type,
+        )
+        if signature_mode != "default":
+            logger.info(
+                "Signature verification mode switched session_id=%s action_type=%s mode=%s",
+                session_id,
+                action_type,
+                signature_mode,
+            )
 
     orchestrator = get_orchestrator(session_id=session_id)
     payload = {
+        "action_type": action_type,
         "question_id": request.quiz_id or request.action_type,
         "response": response_data,
         "behavior_signals": behavior_signals,
@@ -349,6 +545,8 @@ async def interact(
             result.get("payload", {}).get("text")
             or f"Next action selected: {next_node_type}"
         )
+        if bool(request.resume):
+            increment_metric("resume_success_total")
         entropy = float(
             result.get("dashboard_update", {})
             .get("academic", {})

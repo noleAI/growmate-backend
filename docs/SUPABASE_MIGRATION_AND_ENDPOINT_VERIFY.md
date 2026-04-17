@@ -1,8 +1,7 @@
 # Hướng Dẫn Chạy Migration SQL Trên Supabase Và Verify Nhanh Endpoint
 
-Cập nhật: 2026-04-16  
-Phạm vi: Migration và smoke test cho P0/P1/P2.  
-Lưu ý: P3 (premium) đã được team quyết định tạm hoãn, chưa triển khai trong đợt này.
+Cập nhật: 2026-04-17  
+Phạm vi: Migration và smoke test cho P0/P1/P2 + Agentic/RAG runtime.
 
 ---
 
@@ -22,9 +21,9 @@ $env:TOKEN = "<SUPABASE_JWT_TOKEN>"
 
 ---
 
-## 2) Thứ Tự Migration Để Tránh Lỗi Dependency
+## 2) Danh Sách SQL Migration Chuẩn Và Thứ Tự Chạy
 
-Chạy trong Supabase SQL Editor theo đúng thứ tự:
+Chạy trong Supabase SQL Editor theo đúng thứ tự để tránh lỗi phụ thuộc:
 
 1. `sql/user_token_usage.sql`
 2. `sql/user_xp.sql`
@@ -32,28 +31,34 @@ Chạy trong Supabase SQL Editor theo đúng thứ tự:
 4. `sql/user_lives.sql`
 5. `sql/user_profiles.sql`
 6. `sql/session_recovery.sql`
+7. `sql/003_knowledge_chunks.sql`
+8. `sql/004_agentic_reasoning.sql`
 
 Ghi chú:
-- Các file dùng `create table if not exists` và `drop policy if exists`, có thể chạy lại an toàn.
-- Sau khi chạy xong, lưu execution logs để truy vết.
+- `sql/DatabaseSchema.sql` chỉ để tham chiếu, không chạy trực tiếp.
+- `sql/quiz_question_template_TableSchema.sql` là schema bootstrap cho bảng `quiz_question_template` (chỉ chạy khi project chưa có bảng này).
+- Các file migration dùng `create ... if not exists`, `drop policy if exists` nên có thể chạy lại an toàn trong phần lớn trường hợp.
 
 ---
 
 ## 3) Kiểm Tra Schema Sau Migration
 
-Chạy query nhanh trong SQL Editor:
+### 3.1 Kiểm tra các bảng chính
 
 ```sql
 select to_regclass('public.user_token_usage') as user_token_usage,
        to_regclass('public.user_xp') as user_xp,
        to_regclass('public.user_badges') as user_badges,
        to_regclass('public.user_lives') as user_lives,
-       to_regclass('public.user_profiles') as user_profiles;
+       to_regclass('public.user_profiles') as user_profiles,
+       to_regclass('public.knowledge_chunks') as knowledge_chunks,
+       to_regclass('public.reasoning_traces') as reasoning_traces,
+       to_regclass('public.session_reflections') as session_reflections;
 ```
 
-Kỳ vọng: 5 cột đều trả về tên table, không phải `null`.
+Kỳ vọng: tất cả cột đều trả về tên bảng (không phải `null`).
 
-Kiểm tra cột session recovery trong `learning_sessions`:
+### 3.2 Kiểm tra cột session recovery + reasoning mode trong `learning_sessions`
 
 ```sql
 select column_name
@@ -66,14 +71,34 @@ where table_schema = 'public'
     'progress_percent',
     'last_interaction_at',
     'state_snapshot',
+    'reasoning_mode',
     'updated_at'
   )
 order by column_name;
 ```
 
-Kỳ vọng: trả về đủ 6 cột.
+Kỳ vọng: trả về đủ 7 cột.
 
-Kiểm tra RLS:
+### 3.3 Kiểm tra function vector search
+
+```sql
+select to_regprocedure('public.match_knowledge_chunks(vector,integer,text,text)') as match_knowledge_chunks_fn;
+```
+
+Kỳ vọng: khác `null`.
+
+### 3.4 Kiểm tra extension cần thiết
+
+```sql
+select extname
+from pg_extension
+where extname in ('vector', 'pgcrypto')
+order by extname;
+```
+
+Kỳ vọng: có `vector` và `pgcrypto`.
+
+### 3.5 Kiểm tra RLS cho các bảng user-facing
 
 ```sql
 select schemaname, tablename, rowsecurity
@@ -89,7 +114,7 @@ where schemaname = 'public'
 order by tablename;
 ```
 
-Kỳ vọng: `rowsecurity = true` cho tất cả bảng.
+Kỳ vọng: `rowsecurity = true` cho tất cả bảng trong danh sách.
 
 ---
 
@@ -116,7 +141,7 @@ from cron.job
 where jobname = 'growmate-reset-weekly-xp';
 ```
 
-Nếu chưa dùng `pg_cron`, cần có external scheduler gọi function vào thứ 2, 00:00.
+Nếu chưa dùng `pg_cron`, cần external scheduler gọi function vào thứ 2, 00:00.
 
 ---
 
@@ -242,7 +267,18 @@ Kỳ vọng:
 - Có `status = "updated"`
 - Giá trị profile được cập nhật đúng theo request
 
-### 5.12 Session Pending
+### 5.12 Session Pending (khuyến nghị)
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/sessions/pending" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có `has_pending`
+- Nếu `has_pending = true`, payload có `session.session_id`, `last_question_index`, `next_question_index`, `progress_percent`
+
+### 5.13 Session Pending (compat route)
 
 ```powershell
 curl.exe -s -X GET "$env:BASE_URL/session/pending" `
@@ -250,10 +286,9 @@ curl.exe -s -X GET "$env:BASE_URL/session/pending" `
 ```
 
 Kỳ vọng:
-- Có `has_pending`
-- Nếu `has_pending = true`, payload có `session.session_id`, `last_question_index`, `progress_percent`
+- Payload tương đương route ở mục 5.12
 
-### 5.13 Quiz Next
+### 5.14 Quiz Next
 
 ```powershell
 curl.exe -s -X GET "$env:BASE_URL/quiz/next?session_id=<SESSION_ID>&index=0&total_questions=10&mode=explore" `
@@ -265,20 +300,74 @@ Kỳ vọng:
 - Không có `correct_option_id` trong response
 - `mode` phản hồi đúng `explore` hoặc `exam_prep`
 
-### 5.14 Quiz Submit
+### 5.15 Quiz Submit
 
 ```powershell
 curl.exe -s -X POST "$env:BASE_URL/quiz/submit" `
   -H "Authorization: Bearer $env:TOKEN" `
   -H "Content-Type: application/json" `
+  -H "X-Growmate-Timestamp: <UNIX_SECONDS>" `
+  -H "X-Growmate-Signature: <HMAC_SHA256>" `
   -d '{"session_id":"<SESSION_ID>","question_id":"MATH_DERIV_1","selected_option":"A","mode":"exam_prep"}'
 ```
 
 Kỳ vọng:
-- Có `is_correct`, `explanation`
+- Có `is_correct`, `explanation`, `score`, `max_score`
+- Có `progress_percent`, `last_question_index`, `total_questions`, `quiz_summary`
 - Không có `correct_answer` hoặc `correct_option_id`
 
-### 5.15 HMAC Verify Cho Quiz Requests
+### 5.16 Quiz Result Theo Session
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/quiz/sessions/<SESSION_ID>/result" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có `summary` (answered_count/correct_count/total_score/max_score/accuracy_percent)
+- Có `attempts[]` để render review sau bài
+
+### 5.17 Quiz History
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/quiz/history?limit=20&offset=0" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có `items[]` gồm thông tin session + summary
+
+### 5.18 Runtime Metrics (Ops)
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/inspection/runtime-metrics" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có `metrics` object
+
+### 5.19 Runtime Alerts Preview (Ops)
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/inspection/runtime-alerts" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có `alerts`, `count`, `dispatch=false`
+
+### 5.20 Runtime Alerts Dispatch (Ops)
+
+```powershell
+curl.exe -s -X GET "$env:BASE_URL/inspection/runtime-alerts?dispatch=true" `
+  -H "Authorization: Bearer $env:TOKEN"
+```
+
+Kỳ vọng:
+- Có thông tin dispatch và webhook delivery status
+
+### 5.21 HMAC Verify Cho Quiz Requests
 
 Khi đã bật `QUIZ_HMAC_SECRET`, kỳ vọng:
 - Thiếu signature headers -> `401 missing_signature_headers`
@@ -289,14 +378,14 @@ Khi đã bật `QUIZ_HMAC_SECRET`, kỳ vọng:
 
 ## 6) Verify Guard Khi Hết Tim
 
-Mục tiêu: endpoint session interact trả 403 nếu user hết tim và action là quiz submit.
+Mục tiêu: endpoint session interact trả 403 nếu user hết tim và action là quiz submit trong mode `exam_prep`.
 
 ```powershell
 $sessionId = "<SESSION_ID>"
 curl.exe -s -X POST "$env:BASE_URL/sessions/$sessionId/interact" `
   -H "Authorization: Bearer $env:TOKEN" `
   -H "Content-Type: application/json" `
-  -d '{"action_type":"submit_answer","response_data":{"answer":"A"}}'
+  -d '{"action_type":"submit_answer","mode":"exam_prep","response_data":{"answer":"A"}}'
 ```
 
 Kỳ vọng:
@@ -308,8 +397,9 @@ Kỳ vọng:
 
 ## 7) Checklist Sign-off Trước Khi Handoff Frontend
 
-- [ ] Đã apply đủ 6 migration SQL trên đúng project
-- [ ] Đã verify tồn tại table + RLS
+- [ ] Đã apply đủ 8 migration SQL trên đúng project
+- [ ] Đã verify bảng + cột + function cho cả recovery và agentic migrations
+- [ ] Đã verify RLS cho các bảng user-facing
 - [ ] Đã test đủ các endpoint smoke test ở mục 5
 - [ ] Đã test 403 `no_lives_remaining` cho quiz submit
 - [ ] Đã cấu hình lịch weekly reset cho XP trên production

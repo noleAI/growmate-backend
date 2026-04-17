@@ -53,7 +53,9 @@ async def test_get_pending_session_returns_payload(monkeypatch) -> None:
     assert result["has_pending"] is True
     assert result["session"]["session_id"] == "sess-1"
     assert result["session"]["last_question_index"] == 4
+    assert result["session"]["next_question_index"] == 4
     assert result["session"]["progress_percent"] == 40
+    assert result["session"]["resume_context_version"] == 1
 
 
 @pytest.mark.asyncio

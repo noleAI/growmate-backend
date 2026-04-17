@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from api.routes.orchestrator_runtime import get_orchestrator
+from core.runtime_alerts import evaluate_runtime_alerts, maybe_emit_runtime_alerts
+from core.runtime_metrics import get_metrics_snapshot
 from core.security import get_current_user
 
 router = APIRouter()
@@ -41,3 +43,34 @@ async def get_q_values(user: dict = Depends(get_current_user)):
 @router.get("/audit-logs/{session_id}")
 async def get_audit_logs(session_id: str, user: dict = Depends(get_current_user)):
     return {"session_id": session_id, "logs": []}
+
+
+@router.get("/runtime-metrics")
+async def get_runtime_metrics(user: dict = Depends(get_current_user)):
+    del user
+    return {"metrics": get_metrics_snapshot()}
+
+
+@router.get("/runtime-alerts")
+async def get_runtime_alerts(
+    dispatch: bool = Query(default=False),
+    user: dict = Depends(get_current_user),
+):
+    del user
+    metrics = get_metrics_snapshot()
+
+    if not dispatch:
+        alerts = evaluate_runtime_alerts(metrics)
+        return {
+            "metrics": metrics,
+            "alerts": alerts,
+            "count": len(alerts),
+            "dispatch": False,
+        }
+
+    dispatched = await maybe_emit_runtime_alerts(
+        trigger="inspection_runtime_alerts_endpoint",
+        metrics=metrics,
+    )
+    dispatched["dispatch"] = True
+    return dispatched

@@ -1,0 +1,20 @@
+[
+  {
+    "chapter": "dao_ham",
+    "section": "chain_rule_missed_inner",
+    "content": "Lỗi thường gặp: Quên nhân đạo hàm lớp trong khi dùng chain rule. Cách sửa: viết rõ $u = g(x)$, sau đó nhân thêm $u'$.",
+    "latex": "\\text{Sai: }(f(g(x)))' = f'(g(x));\\quad \\text{Đúng: }(f(g(x)))' = f'(g(x))\\cdot g'(x)"
+  },
+  {
+    "chapter": "dao_ham",
+    "section": "trig_sign_error",
+    "content": "Lỗi thường gặp: Viết sai dấu của $(\\cos x)'$ thành $+\\sin x$. Nhớ rằng $(\\cos x)' = -\\sin x$.",
+    "latex": "(\\cos x)' = -\\sin x"
+  },
+  {
+    "chapter": "dao_ham",
+    "section": "quotient_rule_parentheses",
+    "content": "Lỗi thường gặp: Thiếu ngoặc ở tử số trong quy tắc thương. Cách sửa: viết đầy đủ $\\dfrac{u'v - uv'}{v^2}$ trước khi rút gọn.",
+    "latex": "\\left(\\dfrac{u}{v}\\right)' = \\dfrac{u'v-uv'}{v^2}"
+  }
+]

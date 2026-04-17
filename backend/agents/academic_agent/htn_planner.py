@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
@@ -143,6 +144,120 @@ class HTNPlanner(IAgent):
             return new_method, True
         else:
             return "hitl_escalation", False
+
+    async def generate_dynamic_plan(
+        self,
+        session_id: str,
+        context: Dict[str, Any],
+        llm_service: Any,
+    ) -> List[str]:
+        """Generate a short dynamic action plan using LLM, with deterministic fallback."""
+        del session_id
+
+        prompt = f"""Plan 3-5 next tutoring actions as JSON array.
+
+Student context:
+- confidence: {float(context.get('confidence', 0.0) or 0.0):.2f}
+- confusion: {float(context.get('confusion', 0.0) or 0.0):.2f}
+- fatigue: {float(context.get('fatigue', 0.0) or 0.0):.2f}
+- entropy: {float(context.get('entropy', 1.0) or 1.0):.2f}
+- top_hypothesis: {context.get('top_hypothesis', 'unknown')}
+- accuracy_recent: {float(context.get('accuracy_recent', 0.0) or 0.0):.2f}
+- step: {int(context.get('step', 0) or 0)}
+
+Allowed actions only:
+["next_question", "show_hint", "drill_practice", "de_stress", "hitl"]
+
+Rules:
+- If fatigue > 0.7, first action should be de_stress.
+- If accuracy_recent < 0.3, include drill_practice before next_question.
+- Avoid more than 2 consecutive drill_practice.
+- End with next_question when possible.
+
+Return JSON array only.
+"""
+
+        try:
+            if llm_service is None or getattr(llm_service, "model", None) is None:
+                raise ValueError("LLM service is unavailable")
+
+            response = llm_service.model.generate_content(
+                prompt,
+                generation_config={"temperature": 0.3, "max_output_tokens": 256},
+            )
+            text = str(getattr(response, "text", "") or "").strip()
+            parsed = json.loads(text)
+
+            if isinstance(parsed, list):
+                normalized = self._normalize_dynamic_plan(
+                    parsed,
+                    context=context,
+                    max_length=5,
+                )
+                if normalized:
+                    return normalized[:5]
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Dynamic HTN plan generation failed: %s", exc)
+
+        return ["next_question", "show_hint", "next_question"]
+
+    def _normalize_dynamic_plan(
+        self,
+        raw_plan: List[Any],
+        context: Dict[str, Any],
+        max_length: int = 5,
+    ) -> List[str]:
+        allowed = {
+            "next_question",
+            "show_hint",
+            "drill_practice",
+            "de_stress",
+            "hitl",
+        }
+        normalized: List[str] = []
+        for item in raw_plan:
+            action = str(item).strip()
+            if action in allowed:
+                normalized.append(action)
+
+        if not normalized:
+            return []
+
+        max_len = max(1, int(max_length or 5))
+        normalized = normalized[:max_len]
+
+        # Enforce no more than 2 consecutive drill_practice actions.
+        checked: List[str] = []
+        drill_streak = 0
+        for action in normalized:
+            if action == "drill_practice":
+                drill_streak += 1
+                if drill_streak > 2:
+                    checked.append("next_question")
+                    drill_streak = 0
+                    continue
+            else:
+                drill_streak = 0
+            checked.append(action)
+        normalized = checked
+
+        fatigue = float(context.get("fatigue", 0.0) or 0.0)
+        if fatigue > 0.7 and normalized[0] != "de_stress":
+            normalized.insert(0, "de_stress")
+
+        accuracy_recent = float(context.get("accuracy_recent", 0.0) or 0.0)
+        if accuracy_recent < 0.3:
+            next_idx = next(
+                (idx for idx, action in enumerate(normalized) if action == "next_question"),
+                None,
+            )
+            if next_idx is not None and "drill_practice" not in normalized[:next_idx]:
+                normalized.insert(next_idx, "drill_practice")
+
+        if normalized[-1] != "next_question":
+            normalized.append("next_question")
+
+        return normalized[:max_len]
 
     def _execute_primitive(self, task_id: str, context: Dict[str, Any]) -> AgentOutput:
         # Map ID to backend call action
