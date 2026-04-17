@@ -1,9 +1,13 @@
+from dotenv import load_dotenv
+load_dotenv()  # Populate os.environ from .env BEFORE any service initialization
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import (
+    chatbot,
     config,
     formulas,
     inspection,
@@ -73,6 +77,7 @@ app.include_router(lives.router, prefix="/api/v1", tags=["Lives"])
 app.include_router(formulas.router, prefix="/api/v1", tags=["Formulas"])
 app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["Onboarding"])
 app.include_router(user_profile.router, prefix="/api/v1", tags=["UserProfile"])
+app.include_router(chatbot.router, prefix="/api/v1/chatbot", tags=["Chatbot"])
 app.include_router(
     orchestrator.router,
     prefix="/api/v1/orchestrator",
