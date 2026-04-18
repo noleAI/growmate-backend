@@ -58,7 +58,13 @@ class LLMService:
         self.gcp_project_id = os.getenv("GCP_PROJECT_ID", "")
         self.gcp_location = os.getenv("GCP_LOCATION", "us-central1")
         self.model_name = os.getenv("VERTEX_MODEL_NAME", "gemini-2.5-flash")
+<<<<<<< Updated upstream
         self.model: Any = None
+=======
+        # Keep legacy attribute for agentic flow/tests that still use model.generate_content.
+        self.model: Any = None
+        self._client: Any = None
+>>>>>>> Stashed changes
         self._init_error: str | None = None
 
         try:
@@ -196,7 +202,8 @@ Hãy trả về JSON với đúng 2 key:
         tool_timeout_ms: int | None = None,
     ) -> dict[str, Any]:
         """Run iterative tool-calling reasoning and return a structured decision."""
-        if self.model is None:
+        model = getattr(self, "model", None)
+        if model is None:
             return self._agentic_fallback("Model is not initialized")
 
         reasoning_timeout_ms = max(
@@ -219,7 +226,7 @@ Hãy trả về JSON với đúng 2 key:
         try:
             response = await asyncio.wait_for(
                 asyncio.to_thread(
-                    lambda: self.model.generate_content(
+                    lambda: model.generate_content(
                         prompt,
                         generation_config={
                             "temperature": 0.3,
@@ -303,7 +310,7 @@ Hãy trả về JSON với đúng 2 key:
 
                 response = await asyncio.wait_for(
                     asyncio.to_thread(
-                        lambda: self.model.generate_content(
+                        lambda: model.generate_content(
                             [
                                 prompt,
                                 Part.from_function_response(

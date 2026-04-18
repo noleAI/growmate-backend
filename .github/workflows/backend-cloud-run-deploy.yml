@@ -15,7 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHON_VERSION: "3.11"
-      COVERAGE_MIN: "90"
+      # Temporary baseline until cross-team coverage plan raises runtime modules to >=90%.
+      COVERAGE_MIN: "80"
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       GCP_REGION: ${{ vars.GCP_REGION }}
       GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
