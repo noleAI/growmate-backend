@@ -1,7 +1,9 @@
 from collections import defaultdict
 from typing import DefaultDict, List
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+
+from core.security import get_current_user_ws
 
 router = APIRouter()
 
@@ -42,7 +44,11 @@ manager = DashboardConnectionManager()
 
 
 @router.websocket("/stream")
-async def websocket_dashboard_all(websocket: WebSocket):
+async def websocket_dashboard_all(
+    websocket: WebSocket,
+    user: dict = Depends(get_current_user_ws),
+):
+    del user
     await manager.connect("*", websocket)
     try:
         while True:
@@ -52,7 +58,12 @@ async def websocket_dashboard_all(websocket: WebSocket):
 
 
 @router.websocket("/stream/{session_id}")
-async def websocket_dashboard_session(websocket: WebSocket, session_id: str):
+async def websocket_dashboard_session(
+    websocket: WebSocket,
+    session_id: str,
+    user: dict = Depends(get_current_user_ws),
+):
+    del user
     await manager.connect(session_id, websocket)
     try:
         while True:

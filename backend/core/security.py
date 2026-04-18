@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, WebSocket, WebSocketException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import InvalidTokenError, PyJWKClient
 from jwt.exceptions import PyJWKClientError
@@ -31,28 +31,64 @@ def _get_jwks_client(jwks_url: str) -> PyJWKClient:
     return PyJWKClient(jwks_url)
 
 
+def _decode_bearer_token(token: str, settings: Settings) -> dict[str, Any]:
+    issuer = _resolve_supabase_issuer(settings)
+    decode_kwargs: dict[str, Any] = {
+        "algorithms": ["RS256", "ES256"],
+        "issuer": issuer,
+    }
+    if settings.supabase_jwt_audience:
+        decode_kwargs["audience"] = settings.supabase_jwt_audience
+
+    jwks_client = _get_jwks_client(_resolve_supabase_jwks_url(settings))
+    signing_key = jwks_client.get_signing_key_from_jwt(token)
+    return jwt.decode(token, signing_key.key, **decode_kwargs)
+
+
+def _normalize_bearer_value(value: str | None) -> str:
+    token = str(value or "").strip()
+    if token.lower().startswith("bearer "):
+        token = token.split(" ", 1)[1].strip()
+    return token
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     settings: Settings = Depends(get_settings),
 ):
     token = credentials.credentials
     try:
-        issuer = _resolve_supabase_issuer(settings)
-        decode_kwargs: dict[str, Any] = {
-            "algorithms": ["RS256", "ES256"],
-            "issuer": issuer,
-        }
-        if settings.supabase_jwt_audience:
-            decode_kwargs["audience"] = settings.supabase_jwt_audience
-
-        jwks_client = _get_jwks_client(_resolve_supabase_jwks_url(settings))
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
-        return jwt.decode(token, signing_key.key, **decode_kwargs)
+        return _decode_bearer_token(token, settings)
     except (InvalidTokenError, PyJWKClientError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+def get_current_user_ws(
+    websocket: WebSocket,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, Any]:
+    header_token = _normalize_bearer_value(websocket.headers.get("authorization"))
+    query_token = _normalize_bearer_value(
+        websocket.query_params.get("access_token") or websocket.query_params.get("token")
+    )
+    token = header_token or query_token
+
+    if not token:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Missing bearer token",
+        )
+
+    try:
+        return _decode_bearer_token(token, settings)
+    except (InvalidTokenError, PyJWKClientError) as exc:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Could not validate credentials",
         ) from exc
 
 
