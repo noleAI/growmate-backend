@@ -110,3 +110,18 @@ async def test_agentic_latency_budget_smoke(monkeypatch: pytest.MonkeyPatch) -> 
 
     p95 = sorted(latencies)[max(0, int(len(latencies) * 0.95) - 1)]
     assert p95 < 5.0
+
+
+@pytest.mark.asyncio
+async def test_latency_helpers_executed() -> None:
+    llm = _LLMStub()
+    res = await llm.generate("prompt", "fallback")
+    assert getattr(res, "text", None) == "ok"
+    assert getattr(res, "fallback_used", True) is False
+
+    academic = _AcademicAgent()
+    empathy = _EmpathyAgent()
+    strategy = _StrategyAgent()
+    assert academic.name == "academic"
+    assert empathy.name == "empathy"
+    assert strategy.name == "strategy"
