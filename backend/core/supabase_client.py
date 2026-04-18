@@ -217,6 +217,150 @@ async def get_latest_active_learning_session(
     return None
 
 
+async def get_learning_session_by_id(
+    session_id: str,
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any] | None:
+    def _select_full():
+        query = (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select(
+                "id,student_id,start_time,end_time,status,last_question_index,total_questions,progress_percent,last_interaction_at,state_snapshot"
+            )
+            .eq("id", session_id)
+        )
+        if student_id:
+            query = query.eq("student_id", student_id)
+        return query.limit(1).execute()
+
+    def _select_basic():
+        query = (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select("id,student_id,start_time,end_time,status")
+            .eq("id", session_id)
+        )
+        if student_id:
+            query = query.eq("student_id", student_id)
+        return query.limit(1).execute()
+
+    try:
+        response = await _run_with_retry("get_learning_session_by_id", _select_full)
+    except Exception:
+        response = await _run_with_retry(
+            "get_learning_session_by_id_basic",
+            _select_basic,
+        )
+
+    rows = getattr(response, "data", []) or []
+    if rows and isinstance(rows[0], dict):
+        return rows[0]
+
+    return None
+
+
+async def list_learning_sessions(
+    student_id: str,
+    statuses: list[str] | None = None,
+    limit: int = 20,
+    offset: int = 0,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    normalized_statuses = [
+        str(value).strip().lower() for value in (statuses or []) if str(value).strip()
+    ]
+
+    def _select():
+        query = (
+            get_supabase_client(access_token)
+            .table("learning_sessions")
+            .select(
+                "id,student_id,start_time,end_time,status,last_question_index,total_questions,progress_percent,last_interaction_at,state_snapshot"
+            )
+            .eq("student_id", student_id)
+            .order("start_time", desc=True)
+            .range(max(0, int(offset or 0)), max(0, int(offset or 0)) + max(1, int(limit or 1)) - 1)
+        )
+        if normalized_statuses:
+            query = query.in_("status", normalized_statuses)
+        return query.execute()
+
+    response = await _run_with_retry("list_learning_sessions", _select, timeout_sec=5.0)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def insert_quiz_question_attempt(
+    student_id: str,
+    session_id: str,
+    question_template_id: str,
+    question_type: str,
+    user_answer: Dict[str, Any],
+    evaluation: Dict[str, Any],
+    score: float,
+    max_score: float,
+    is_correct: bool,
+    submitted_at: datetime | str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    submitted_dt = _parse_optional_datetime(submitted_at) or datetime.now(UTC)
+    payload = {
+        "student_id": student_id,
+        "session_id": session_id,
+        "question_template_id": question_template_id,
+        "question_type": question_type,
+        "user_answer": user_answer if isinstance(user_answer, dict) else {},
+        "evaluation": evaluation if isinstance(evaluation, dict) else {},
+        "score": float(score),
+        "max_score": float(max(0.0, max_score)),
+        "is_correct": bool(is_correct),
+        "submitted_at": submitted_dt.astimezone(UTC).isoformat(),
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("quiz_question_attempts")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("insert_quiz_question_attempt", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }
+
+
+async def list_quiz_question_attempts(
+    session_id: str,
+    student_id: str,
+    limit: int = 100,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    safe_limit = max(1, int(limit or 1))
+
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("quiz_question_attempts")
+            .select(
+                "id,student_id,session_id,question_template_id,question_type,user_answer,evaluation,score,max_score,is_correct,submitted_at"
+            )
+            .eq("session_id", session_id)
+            .eq("student_id", student_id)
+            .order("submitted_at", desc=False)
+            .limit(safe_limit)
+            .execute()
+        )
+
+    response = await _run_with_retry("list_quiz_question_attempts", _select, timeout_sec=5.0)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
 async def list_learning_session_ids(
     student_id: str,
     limit: int = 30,
@@ -837,4 +981,108 @@ async def upsert_user_profile(
     return {
         **_default_user_profile(user_id),
         **payload,
+    }
+
+
+async def list_recent_episodic_memory(
+    session_id: str,
+    limit: int = 5,
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> list[Dict[str, Any]]:
+    safe_limit = max(1, int(limit or 1))
+    normalized_student_id = str(student_id or "").strip()
+
+    def _select():
+        query = (
+            get_supabase_client(access_token)
+            .table("episodic_memory")
+            .select("id,student_id,session_id,state,action,outcome,reward,created_at")
+            .eq("session_id", session_id)
+            .order("created_at", desc=True)
+            .limit(safe_limit)
+        )
+        if normalized_student_id:
+            query = query.eq("student_id", normalized_student_id)
+        return query.execute()
+
+    response = await _run_with_retry("list_recent_episodic_memory", _select)
+    rows = getattr(response, "data", []) or []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+async def insert_reasoning_trace(
+    session_id: str,
+    step: int,
+    reasoning_mode: str,
+    tools_called: list[Dict[str, Any]],
+    reasoning_text: str,
+    final_action: str,
+    confidence: float,
+    latency_ms: int,
+    fallback_used: bool = False,
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "session_id": session_id,
+        "student_id": student_id,
+        "step": int(step),
+        "reasoning_mode": reasoning_mode,
+        "tools_called": tools_called,
+        "reasoning_text": reasoning_text,
+        "final_action": final_action,
+        "confidence": float(confidence),
+        "latency_ms": int(latency_ms),
+        "fallback_used": bool(fallback_used),
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("reasoning_traces")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("insert_reasoning_trace", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
+    }
+
+
+async def insert_reflection(
+    session_id: str,
+    step: int,
+    reflection: Dict[str, Any],
+    student_id: str | None = None,
+    access_token: str | None = None,
+) -> Dict[str, Any]:
+    payload = {
+        "session_id": session_id,
+        "student_id": student_id,
+        "step": int(step),
+        "effectiveness": reflection.get("effectiveness"),
+        "entropy_trend": reflection.get("entropy_trend"),
+        "accuracy_trend": reflection.get("accuracy_trend"),
+        "emotion_trend": reflection.get("emotion_trend"),
+        "should_change": bool(reflection.get("should_change_strategy", False)),
+        "recommendation": reflection.get("recommendation"),
+        "priority_action": reflection.get("priority_action"),
+        "reasoning": reflection.get("reasoning"),
+    }
+
+    def _insert():
+        return (
+            get_supabase_client(access_token)
+            .table("session_reflections")
+            .insert(payload)
+            .execute()
+        )
+
+    response = await _run_with_retry("insert_reflection", _insert)
+    return {
+        "data": getattr(response, "data", []),
+        "count": getattr(response, "count", None),
     }

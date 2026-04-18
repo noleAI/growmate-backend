@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import random
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -9,6 +10,8 @@ from core.question_selector import select_quiz_questions_for_mode
 
 
 class QuizService:
+    TEMPLATE_NAMESPACE = uuid.UUID("1f7fd34d-a75f-4ad7-9d49-9b280f4c31a4")
+
     def __init__(self, dataset_path: Path | None = None) -> None:
         base_dir = Path(__file__).resolve().parents[1]
         self.dataset_path = dataset_path or (
@@ -95,11 +98,14 @@ class QuizService:
         if cached:
             return cached
 
+        seeded_rng = random.Random(f"{session_id}:{mode}:{int(total_questions or 0)}")
         selected = select_quiz_questions_for_mode(
             question_pool=self._questions,
             mode=mode,
             num_questions=total_questions,
+            rng=seeded_rng,
         )
+
         question_ids = [
             str(item.get("question_id") or "").strip()
             for item in selected
@@ -137,6 +143,32 @@ class QuizService:
             return None
 
         return self._sanitize_question_for_delivery(session_id, question, safe_index, len(order))
+
+    def get_question_position(
+        self,
+        session_id: str,
+        mode: str,
+        total_questions: int,
+        question_id: str,
+    ) -> int | None:
+        normalized_question_id = str(question_id or "").strip()
+        if not normalized_question_id:
+            return None
+
+        order = self.build_or_get_session_order(session_id, mode, total_questions)
+        if not order:
+            return None
+
+        try:
+            return int(order.index(normalized_question_id))
+        except ValueError:
+            return None
+
+    def compute_question_template_id(self, question_id: str) -> str:
+        normalized_question_id = str(question_id or "").strip()
+        if not normalized_question_id:
+            return ""
+        return str(uuid.uuid5(self.TEMPLATE_NAMESPACE, normalized_question_id))
 
     def _sanitize_question_for_delivery(
         self,
@@ -177,7 +209,9 @@ class QuizService:
                     for item in options
                     if isinstance(item, dict)
                 ]
-                random.shuffle(cloned)
+                random.Random(
+                    f"{session_id}:{response['question_id']}:options"
+                ).shuffle(cloned)
                 order_map[response["question_id"]] = cloned
 
             response["options"] = order_map.get(response["question_id"], [])
@@ -224,6 +258,15 @@ class QuizService:
             if not selected:
                 raise ValueError("selected_option_required")
             is_correct = selected == correct_option_id
+            score = 1.0 if is_correct else 0.0
+            max_score = 1.0
+            user_answer = {"selected_option": selected}
+            evaluation = {
+                "is_correct": bool(is_correct),
+                "score": score,
+                "max_score": max_score,
+                "explanation": explanation,
+            }
 
         elif question_type == "SHORT_ANSWER":
             accepted_answers = payload.get("accepted_answers")
@@ -242,6 +285,15 @@ class QuizService:
             if not submitted:
                 raise ValueError("short_answer_required")
             is_correct = submitted in normalized_accepted
+            score = 1.0 if is_correct else 0.0
+            max_score = 1.0
+            user_answer = {"short_answer": str(short_answer or "").strip()}
+            evaluation = {
+                "is_correct": bool(is_correct),
+                "score": score,
+                "max_score": max_score,
+                "explanation": explanation,
+            }
 
         elif question_type == "TRUE_FALSE_CLUSTER":
             sub_questions = payload.get("sub_questions")
@@ -251,18 +303,32 @@ class QuizService:
             if not isinstance(cluster_answers, dict):
                 raise ValueError("cluster_answers_required")
 
-            is_correct = True
+            correct_count = 0
+            max_score = float(max(1, len(sub_questions)))
             for item in sub_questions:
                 if not isinstance(item, dict):
                     continue
                 sub_id = str(item.get("id") or "").strip()
                 expected = bool(item.get("is_true", False))
                 actual = cluster_answers.get(sub_id)
-                if actual is None:
-                    is_correct = False
-                    continue
-                if bool(actual) != expected:
-                    is_correct = False
+                if actual is not None and bool(actual) == expected:
+                    correct_count += 1
+
+            score = float(max(0, correct_count))
+            is_correct = score >= max_score
+            user_answer = {
+                "cluster_answers": {
+                    str(key): bool(value)
+                    for key, value in cluster_answers.items()
+                }
+            }
+            evaluation = {
+                "is_correct": bool(is_correct),
+                "score": score,
+                "max_score": max_score,
+                "correct_count": int(correct_count),
+                "explanation": explanation,
+            }
 
         else:
             raise ValueError("unsupported_question_type")
@@ -270,9 +336,14 @@ class QuizService:
         return {
             "session_id": session_id,
             "question_id": normalized_question_id,
+            "question_template_id": self.compute_question_template_id(normalized_question_id),
             "question_type": question_type,
             "is_correct": bool(is_correct),
             "explanation": explanation,
+            "score": float(score),
+            "max_score": float(max_score),
+            "user_answer": user_answer,
+            "evaluation": evaluation,
         }
 
 

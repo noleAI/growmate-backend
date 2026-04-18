@@ -8,11 +8,12 @@
       "difficulty": "easy",
       "weight": 1,
       "content": "Đạo hàm của y = 5 là gì?",
+      "content_latex": "Đạo hàm của $y=5$ là gì?",
       "options": [
-        {"id": "A", "text": "0"},
-        {"id": "B", "text": "1"},
-        {"id": "C", "text": "5"},
-        {"id": "D", "text": "x"}
+        {"id": "A", "text": "0", "text_latex": "$0$"},
+        {"id": "B", "text": "1", "text_latex": "$1$"},
+        {"id": "C", "text": "5", "text_latex": "$5$"},
+        {"id": "D", "text": "x", "text_latex": "$x$"}
       ],
       "correct_option_id": "A",
       "related_hypothesis": "H04_Rules"
@@ -23,11 +24,12 @@
       "difficulty": "easy",
       "weight": 1,
       "content": "Đạo hàm của y = x^3 là gì?",
+      "content_latex": "Đạo hàm của $y=x^3$ là gì?",
       "options": [
-        {"id": "A", "text": "x^2"},
-        {"id": "B", "text": "3x^2"},
-        {"id": "C", "text": "3x"},
-        {"id": "D", "text": "x^3"}
+        {"id": "A", "text": "x^2", "text_latex": "$x^2$"},
+        {"id": "B", "text": "3x^2", "text_latex": "$3x^2$"},
+        {"id": "C", "text": "3x", "text_latex": "$3x$"},
+        {"id": "D", "text": "x^3", "text_latex": "$x^3$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H04_Rules"
@@ -38,11 +40,12 @@
       "difficulty": "easy",
       "weight": 1,
       "content": "Đạo hàm của y = sin(x) là gì?",
+      "content_latex": "Đạo hàm của $y=\\sin(x)$ là gì?",
       "options": [
-        {"id": "A", "text": "sin(x)"},
-        {"id": "B", "text": "-sin(x)"},
-        {"id": "C", "text": "cos(x)"},
-        {"id": "D", "text": "-cos(x)"}
+        {"id": "A", "text": "sin(x)", "text_latex": "$\\sin(x)$"},
+        {"id": "B", "text": "-sin(x)", "text_latex": "$-\\sin(x)$"},
+        {"id": "C", "text": "cos(x)", "text_latex": "$\\cos(x)$"},
+        {"id": "D", "text": "-cos(x)", "text_latex": "$-\\cos(x)$"}
       ],
       "correct_option_id": "C",
       "related_hypothesis": "H01_Trig"
@@ -53,11 +56,12 @@
       "difficulty": "medium",
       "weight": 2,
       "content": "Đạo hàm của y = e^(2x) là gì?",
+      "content_latex": "Đạo hàm của $y=e^{2x}$ là gì?",
       "options": [
-        {"id": "A", "text": "e^(2x)"},
-        {"id": "B", "text": "2e^(2x)"},
-        {"id": "C", "text": "2xe^(2x)"},
-        {"id": "D", "text": "4e^(2x)"}
+        {"id": "A", "text": "e^(2x)", "text_latex": "$e^{2x}$"},
+        {"id": "B", "text": "2e^(2x)", "text_latex": "$2e^{2x}$"},
+        {"id": "C", "text": "2xe^(2x)", "text_latex": "$2xe^{2x}$"},
+        {"id": "D", "text": "4e^(2x)", "text_latex": "$4e^{2x}$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H02_ExpLog"
@@ -68,11 +72,12 @@
       "difficulty": "medium",
       "weight": 2,
       "content": "Đạo hàm của y = ln(x) là gì?",
+      "content_latex": "Đạo hàm của $y=\\ln(x)$ là gì?",
       "options": [
-        {"id": "A", "text": "x"},
-        {"id": "B", "text": "1/x"},
-        {"id": "C", "text": "ln(x)"},
-        {"id": "D", "text": "1/(x^2)"}
+        {"id": "A", "text": "x", "text_latex": "$x$"},
+        {"id": "B", "text": "1/x", "text_latex": "$\\dfrac{1}{x}$"},
+        {"id": "C", "text": "ln(x)", "text_latex": "$\\ln(x)$"},
+        {"id": "D", "text": "1/(x^2)", "text_latex": "$\\dfrac{1}{x^2}$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H02_ExpLog"
@@ -83,11 +88,12 @@
       "difficulty": "medium",
       "weight": 2,
       "content": "Đạo hàm của y = (x^2 + 1)^3 là gì?",
+      "content_latex": "Đạo hàm của $y=(x^2+1)^3$ là gì?",
       "options": [
-        {"id": "A", "text": "3(x^2 + 1)^2"},
-        {"id": "B", "text": "6x(x^2 + 1)^2"},
-        {"id": "C", "text": "(x^2 + 1)^2"},
-        {"id": "D", "text": "6x(x^2 + 1)"}
+        {"id": "A", "text": "3(x^2 + 1)^2", "text_latex": "$3(x^2+1)^2$"},
+        {"id": "B", "text": "6x(x^2 + 1)^2", "text_latex": "$6x(x^2+1)^2$"},
+        {"id": "C", "text": "(x^2 + 1)^2", "text_latex": "$(x^2+1)^2$"},
+        {"id": "D", "text": "6x(x^2 + 1)", "text_latex": "$6x(x^2+1)$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H03_Chain"
@@ -98,11 +104,12 @@
       "difficulty": "hard",
       "weight": 3,
       "content": "Đạo hàm của y = sin(x^2) là gì?",
+      "content_latex": "Đạo hàm của $y=\\sin(x^2)$ là gì?",
       "options": [
-        {"id": "A", "text": "cos(x^2)"},
-        {"id": "B", "text": "2x cos(x^2)"},
-        {"id": "C", "text": "2x sin(x^2)"},
-        {"id": "D", "text": "cos(2x)"}
+        {"id": "A", "text": "cos(x^2)", "text_latex": "$\\cos(x^2)$"},
+        {"id": "B", "text": "2x cos(x^2)", "text_latex": "$2x\\cos(x^2)$"},
+        {"id": "C", "text": "2x sin(x^2)", "text_latex": "$2x\\sin(x^2)$"},
+        {"id": "D", "text": "cos(2x)", "text_latex": "$\\cos(2x)$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H03_Chain"
@@ -113,11 +120,12 @@
       "difficulty": "hard",
       "weight": 3,
       "content": "Đạo hàm của y = x^x là gì?",
+      "content_latex": "Đạo hàm của $y=x^x$ là gì?",
       "options": [
-        {"id": "A", "text": "x^(x-1)"},
-        {"id": "B", "text": "x^x(ln(x)+1)"},
-        {"id": "C", "text": "ln(x)"},
-        {"id": "D", "text": "x^x ln(x)"}
+        {"id": "A", "text": "x^(x-1)", "text_latex": "$x^{x-1}$"},
+        {"id": "B", "text": "x^x(ln(x)+1)", "text_latex": "$x^x(\\ln(x)+1)$"},
+        {"id": "C", "text": "ln(x)", "text_latex": "$\\ln(x)$"},
+        {"id": "D", "text": "x^x ln(x)", "text_latex": "$x^x\\ln(x)$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H02_ExpLog"
@@ -128,11 +136,12 @@
       "difficulty": "hard",
       "weight": 3,
       "content": "Đạo hàm của y = (x+1)/(x-1) là gì?",
+      "content_latex": "Đạo hàm của $y=\\dfrac{x+1}{x-1}$ là gì?",
       "options": [
-        {"id": "A", "text": "2/(x-1)^2"},
-        {"id": "B", "text": "-2/(x-1)^2"},
-        {"id": "C", "text": "1/(x-1)"},
-        {"id": "D", "text": "(x-1)^2"}
+        {"id": "A", "text": "2/(x-1)^2", "text_latex": "$\\dfrac{2}{(x-1)^2}$"},
+        {"id": "B", "text": "-2/(x-1)^2", "text_latex": "$-\\dfrac{2}{(x-1)^2}$"},
+        {"id": "C", "text": "1/(x-1)", "text_latex": "$\\dfrac{1}{x-1}$"},
+        {"id": "D", "text": "(x-1)^2", "text_latex": "$(x-1)^2$"}
       ],
       "correct_option_id": "B",
       "related_hypothesis": "H04_Rules"
@@ -143,11 +152,12 @@
       "difficulty": "hard",
       "weight": 3,
       "content": "Đạo hàm của y = e^(sin(x)) là gì?",
+      "content_latex": "Đạo hàm của $y=e^{\\sin(x)}$ là gì?",
       "options": [
-        {"id": "A", "text": "e^(sin(x))"},
-        {"id": "B", "text": "e^(sin(x)) sin(x)"},
-        {"id": "C", "text": "e^(sin(x)) cos(x)"},
-        {"id": "D", "text": "cos(x)"}
+        {"id": "A", "text": "e^(sin(x))", "text_latex": "$e^{\\sin(x)}$"},
+        {"id": "B", "text": "e^(sin(x)) sin(x)", "text_latex": "$e^{\\sin(x)}\\sin(x)$"},
+        {"id": "C", "text": "e^(sin(x)) cos(x)", "text_latex": "$e^{\\sin(x)}\\cos(x)$"},
+        {"id": "D", "text": "cos(x)", "text_latex": "$\\cos(x)$"}
       ],
       "correct_option_id": "C",
       "related_hypothesis": "H03_Chain"

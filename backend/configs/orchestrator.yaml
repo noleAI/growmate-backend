@@ -53,3 +53,37 @@ orchestrator:
     uncertainty_weights:
       academic: 0.4
       empathy: 0.6
+
+agentic:
+  enabled: true
+  llm_reasoning:
+    enabled: true
+    model: "gemini-2.5-flash"
+    temperature: 0.3
+    max_tokens: 1024
+    max_steps: 5
+    timeout_ms: 8000
+
+  rag:
+    enabled: true
+    embedding_model: "text-embedding-004"
+    top_k: 3
+    sources:
+      - "sgk_toan_12"
+      - "cong_thuc"
+      - "bai_giai_mau"
+      - "loi_thuong_gap"
+
+  reflection:
+    enabled: true
+    interval: 5
+    max_tokens: 512
+
+  planning:
+    enabled: false
+    max_plan_length: 5
+
+  fallback:
+    strategy: "adaptive"
+    max_retries: 1
+    timeout_ms: 3000

@@ -14,9 +14,12 @@ def select_quiz_questions_for_mode(
     question_pool: List[Dict[str, Any]],
     mode: str,
     num_questions: int = 10,
+    rng: random.Random | None = None,
 ) -> List[Dict[str, Any]]:
     if num_questions <= 0 or not question_pool:
         return []
+
+    active_rng = rng or random
 
     normalized_mode = str(mode or "explore").strip().lower()
     if normalized_mode not in {"exam_prep", "explore"}:
@@ -38,7 +41,7 @@ def select_quiz_questions_for_mode(
         grouped[_difficulty(question)].append(question)
 
     for bucket in grouped.values():
-        random.shuffle(bucket)
+        active_rng.shuffle(bucket)
 
     selected: List[Dict[str, Any]] = []
     used_ids: set[str] = set()
@@ -61,14 +64,14 @@ def select_quiz_questions_for_mode(
             for question in question_pool
             if _question_id(question) not in used_ids
         ]
-        random.shuffle(leftovers)
+        active_rng.shuffle(leftovers)
         for question in leftovers:
             if len(selected) >= num_questions:
                 break
             selected.append(question)
             used_ids.add(_question_id(question))
 
-    random.shuffle(selected)
+    active_rng.shuffle(selected)
     return selected[:num_questions]
 
 

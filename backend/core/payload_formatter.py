@@ -45,6 +45,10 @@ def format_dashboard_payload(
     final_action: str,
     final_action_payload: dict,
     orchestrator_decision: Optional[Dict[str, Any]] = None,
+    reasoning_mode: Optional[str] = None,
+    reasoning_trace: Optional[list[Dict[str, Any]]] = None,
+    reasoning_content: Optional[str] = None,
+    reasoning_confidence: Optional[float] = None,
 ) -> dict:
     """
     Formats the complete dashboard update payload emitted via websockets.
@@ -92,5 +96,14 @@ def format_dashboard_payload(
             },
             "monitoring": orchestrator_decision.get("monitoring", {}),
         }
+
+    if reasoning_mode:
+        payload["reasoning_mode"] = reasoning_mode
+    if reasoning_trace is not None:
+        payload["reasoning_trace"] = reasoning_trace
+    if reasoning_content:
+        payload["reasoning_content"] = reasoning_content
+    if reasoning_confidence is not None:
+        payload["reasoning_confidence"] = float(reasoning_confidence)
 
     return payload
