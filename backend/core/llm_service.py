@@ -13,19 +13,91 @@ Public API (unchanged so existing callers keep working):
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from core.tool_registry import ToolRegistry
+
+
+AGENTIC_SYSTEM_PROMPT = """Ban la gia su AI GrowMate cho hoc sinh Toan THPT Viet Nam.
+
+Muc tieu:
+- Khong doan mo, luon goi tool de lay du lieu truoc khi quyet dinh.
+- Chon action tiep theo dua tren tri thuc hoc tap + trang thai cam xuc.
+- Tao noi dung ngan gon, than thien, ca nhan hoa.
+
+Quy trinh uu tien:
+1. Goi get_academic_beliefs
+2. Goi get_empathy_state
+3. Co the goi get_strategy_suggestion, get_student_history, get_formula_bank, search_knowledge
+4. Chon action cuoi cung
+
+Actions hop le:
+- next_question
+- show_hint
+- drill_practice
+- de_stress
+- hitl
+
+Quy tac:
+- fatigue >= 0.8 thi uu tien de_stress.
+- confusion >= 0.7 va entropy cao thi uu tien show_hint.
+- accuracy thap trong lich su gan day thi uu tien drill_practice.
+- Neu khong chac chan, co the chon hitl.
+
+Tra ve JSON:
+{
+    "action": "<action>",
+    "content": "<noi dung cho hoc sinh>",
+    "reasoning": "<ly do ngan>",
+    "confidence": <0.0-1.0>
+}
+"""
+
 
 class LLMResponseBase(BaseModel):
     text: str
     fallback_used: bool = False
+
+
+class _LegacyModelAdapter:
+    """Expose a `generate_content` API compatible with legacy tests/callers."""
+
+    def __init__(self, client: Any, model_name: str) -> None:
+        self._client = client
+        self._model_name = model_name
+
+    def generate_content(
+        self,
+        contents: Any,
+        generation_config: dict[str, Any] | None = None,
+        tools: list | None = None,
+    ) -> Any:
+        from google.genai import types as genai_types  # type: ignore[import]
+
+        config_kwargs = dict(generation_config or {})
+        if tools is not None:
+            config_kwargs["tools"] = tools
+
+        config = (
+            genai_types.GenerateContentConfig(**config_kwargs)
+            if config_kwargs
+            else None
+        )
+
+        return self._client.models.generate_content(
+            model=self._model_name,
+            contents=contents,
+            config=config,
+        )
 
 
 class LLMService:
@@ -36,6 +108,7 @@ class LLMService:
         self.gcp_location = os.getenv("GCP_LOCATION", "us-central1")
         self.model_name = os.getenv("VERTEX_MODEL_NAME", "gemini-2.5-flash")
         self._client: Any = None
+        self.model: Any = None
         self._init_error: str | None = None
 
         try:
@@ -49,6 +122,8 @@ class LLMService:
                 project=self.gcp_project_id,
                 location=self.gcp_location,
             )
+            # Keep a legacy-compatible model object used by historical tests.
+            self.model = _LegacyModelAdapter(self._client, self.model_name)
             logger.info(
                 "google-genai client initialized: project=%s location=%s model=%s",
                 self.gcp_project_id,
@@ -306,7 +381,6 @@ Hãy trả về JSON với đúng 2 key:
         except Exception as exc:  # noqa: BLE001
             logger.exception("generate_chat_response_with_image failed: %s", exc)
             return fallback
-
 
     # ------------------------------------------------------------------
     # Async wrapper — used by orchestrator (non-blocking)
