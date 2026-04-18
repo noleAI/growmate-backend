@@ -82,8 +82,11 @@ class LLMService:
         max_tokens: int = 1024,
         response_mime_type: str | None = None,
         tools: list | None = None,
+        image_bytes: bytes | None = None,
+        image_mime_type: str = "image/jpeg",
     ) -> str:
-        """Synchronous model call — run inside asyncio.to_thread."""
+        """Synchronous model call — run inside asyncio.to_thread.
+        Supports multimodal (vision) requests when image_bytes is provided."""
         from google.genai import types as genai_types  # type: ignore[import]
 
         config_kwargs: dict[str, Any] = {
@@ -95,9 +98,21 @@ class LLMService:
         if tools:
             config_kwargs["tools"] = tools
 
+        # Build content — multimodal if image provided
+        if image_bytes:
+            contents = [
+                genai_types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=image_mime_type,
+                ),
+                genai_types.Part.from_text(text=prompt),
+            ]
+        else:
+            contents = prompt
+
         response = self._client.models.generate_content(
             model=self.model_name,
-            contents=prompt,
+            contents=contents,
             config=genai_types.GenerateContentConfig(**config_kwargs),
         )
         return (response.text or "").strip()
@@ -239,6 +254,59 @@ Hãy trả về JSON với đúng 2 key:
         except Exception as exc:  # noqa: BLE001
             logger.exception("generate_chat_response failed: %s", exc)
             return fallback
+
+    # ------------------------------------------------------------------
+    # Vision chatbot — image + text → answer
+    # ------------------------------------------------------------------
+
+    async def generate_chat_response_with_image(
+        self,
+        system_prompt: str,
+        user_message: str,
+        image_bytes: bytes,
+        image_mime_type: str = "image/jpeg",
+        fallback: str = "Xin lỗi, mình chưa thể phân tích ảnh lúc này. Bạn thử lại sau nhé! 🙏",
+    ) -> str:
+        """
+        Analyze an image and respond to the user's question about it.
+
+        Args:
+            system_prompt: Content policy / persona instructions.
+            user_message: User's question about the image.
+            image_bytes: Raw image bytes (JPEG/PNG/WEBP/GIF).
+            image_mime_type: MIME type of the image.
+            fallback: Returned when the model is unavailable.
+        """
+        if not self._ready:
+            logger.warning("Client not initialized (%s), returning fallback.", self._init_error)
+            return fallback
+
+        vision_prompt = (
+            f"{system_prompt}\n\n"
+            f"Học sinh gửi một bức ảnh và hỏi: {user_message}\n\n"
+            f"Hãy phân tích nội dung trong ảnh và trả lời câu hỏi của học sinh một cách chi tiết, "
+            f"dễ hiểu. Nếu ảnh chứa bài tập, hãy gợi ý phương pháp giải (không đưa đáp án thẳng). "
+            f"Nếu ảnh không liên quan đến học tập, hãy từ chối lịch sự.\n\n"
+            f"GrowMate AI:"
+        )
+
+        try:
+            raw = await asyncio.to_thread(
+                self._call_model,
+                vision_prompt,
+                temperature=0.5,
+                max_tokens=1500,
+                image_bytes=image_bytes,
+                image_mime_type=image_mime_type,
+            )
+            if not raw:
+                raise ValueError("Empty response from model")
+            logger.info("Vision chat response generated successfully.")
+            return raw
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("generate_chat_response_with_image failed: %s", exc)
+            return fallback
+
 
     # ------------------------------------------------------------------
     # Async wrapper — used by orchestrator (non-blocking)
