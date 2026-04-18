@@ -39,13 +39,15 @@ try:
 except ValueError:
     DAILY_CHAT_LIMIT_FREE = 30
 
-CHAT_QUOTA_UNLIMITED = os.getenv("CHAT_QUOTA_UNLIMITED", "true").strip().lower() in {
+CHAT_QUOTA_UNLIMITED = os.getenv("CHAT_QUOTA_UNLIMITED", "false").strip().lower() in {
     "1",
     "true",
     "yes",
     "on",
 }
 UNLIMITED_REMAINING_QUOTA = 2_147_483_647
+HISTORY_SIGNING_CONCURRENCY = max(1, int(os.getenv("HISTORY_SIGNING_CONCURRENCY", "8")))
+STORAGE_REMOVE_BATCH_SIZE = 100
 MAX_HISTORY_TURNS = 10              # rolling window sent to LLM
 MAX_MESSAGE_LENGTH = 1000           # characters
 VN_TZ = timezone(timedelta(hours=7))
@@ -57,6 +59,12 @@ except ValueError:
     CHAT_IMAGE_SIGNED_URL_TTL_SEC = 3600
 
 _chat_image_bucket_missing_notified = False
+_ALLOWED_IMAGE_EXTENSION_BY_MIME = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 _SYSTEM_PROMPT_TEMPLATE = """Bạn là GrowMate AI — gia sư trực tuyến thông minh dành riêng cho học sinh THPT Việt Nam (lớp 10, 11, 12).
@@ -183,7 +191,7 @@ async def _load_recent_history(
 ) -> list[dict[str, Any]]:
     """Load last N messages from Supabase for context (oldest first)."""
 
-    def _select():
+    def _select_with_attachments():
         return (
             get_supabase_client(access_token)
             .table("chat_history")
@@ -197,20 +205,55 @@ async def _load_recent_history(
             .execute()
         )
 
-    try:
-        response = await _run_with_retry("load_recent_history", _select)
-        rows = getattr(response, "data", []) or []
-        valid_rows = [r for r in rows if isinstance(r, dict)]
+    def _select_legacy():
+        return (
+            get_supabase_client(access_token)
+            .table("chat_history")
+            .select("role,content,created_at")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
 
-        # Keep deterministic order when created_at ties happen (legacy rows).
-        # user should appear before assistant for the same timestamp.
-        valid_rows.sort(
+    def _sort_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows.sort(
             key=lambda r: (
                 str(r.get("created_at") or ""),
                 0 if str(r.get("role") or "") == "user" else 1,
             )
         )
-        return valid_rows
+        return rows
+
+    try:
+        response = await _run_with_retry("load_recent_history", _select_with_attachments)
+    except Exception as exc:  # noqa: BLE001
+        if not _is_missing_attachment_columns_error(exc):
+            logger.warning("Failed to load chat history: %s", exc)
+            return []
+
+        logger.warning(
+            "chat_history attachment columns are missing; using legacy select. "
+            "Run supabase_chat_history_migration.sql to enable image attachments."
+        )
+        try:
+            response = await _run_with_retry("load_recent_history_legacy", _select_legacy)
+            rows = getattr(response, "data", []) or []
+            valid_rows = [r for r in rows if isinstance(r, dict)]
+            for row in valid_rows:
+                row.setdefault("attachment_type", None)
+                row.setdefault("attachment_path", None)
+                row.setdefault("attachment_mime_type", None)
+                row.setdefault("attachment_file_name", None)
+            return _sort_rows(valid_rows)
+        except Exception as legacy_exc:  # noqa: BLE001
+            logger.warning("Failed to load legacy chat history: %s", legacy_exc)
+            return []
+
+    try:
+        rows = getattr(response, "data", []) or []
+        valid_rows = [r for r in rows if isinstance(r, dict)]
+        return _sort_rows(valid_rows)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to load chat history: %s", exc)
         return []
@@ -223,19 +266,9 @@ def _sanitize_filename(file_name: str | None) -> str:
     return cleaned or "image.jpg"
 
 
-def _infer_extension(file_name: str, mime_type: str) -> str:
-    if "." in file_name:
-        ext = file_name.rsplit(".", 1)[1].lower()
-        if ext:
-            return ext
-
-    fallback_map = {
-        "image/jpeg": "jpg",
-        "image/png": "png",
-        "image/webp": "webp",
-        "image/gif": "gif",
-    }
-    return fallback_map.get(mime_type, "jpg")
+def _infer_extension(mime_type: str) -> str:
+    # Derive extension from validated MIME type only. Do not trust filename extension.
+    return _ALLOWED_IMAGE_EXTENSION_BY_MIME.get(str(mime_type or "").lower(), "jpg")
 
 
 def _is_bucket_not_found_error(exc: Exception) -> bool:
@@ -243,6 +276,13 @@ def _is_bucket_not_found_error(exc: Exception) -> bool:
     return "bucket not found" in message or (
         "statuscode" in message and "404" in message and "bucket" in message
     )
+
+
+def _is_missing_attachment_columns_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    if "42703" in message:
+        return True
+    return "attachment_type" in message or "attachment_path" in message
 
 
 async def _upload_chat_image_to_storage(
@@ -257,7 +297,7 @@ async def _upload_chat_image_to_storage(
     global _chat_image_bucket_missing_notified
 
     safe_file_name = _sanitize_filename(original_file_name)
-    extension = _infer_extension(safe_file_name, image_mime_type)
+    extension = _infer_extension(image_mime_type)
     object_path = (
         f"{user_id}/chat_images/{datetime.now(UTC).strftime('%Y/%m/%d')}/"
         f"{uuid.uuid4().hex}.{extension}"
@@ -359,6 +399,84 @@ async def _build_history_attachment(
         "url": signed_url,
         "url_expires_in": CHAT_IMAGE_SIGNED_URL_TTL_SEC,
     }
+
+
+async def _build_history_attachments_parallel(
+    messages: list[dict[str, Any]],
+    access_token: str,
+) -> dict[int, dict[str, Any] | None]:
+    semaphore = asyncio.Semaphore(HISTORY_SIGNING_CONCURRENCY)
+
+    async def _build_for_index(index: int, row: dict[str, Any]):
+        async with semaphore:
+            attachment = await _build_history_attachment(row, access_token)
+            return index, attachment
+
+    tasks = [
+        _build_for_index(i, row)
+        for i, row in enumerate(messages)
+        if str(row.get("attachment_type") or "").strip() == "image"
+        and str(row.get("attachment_path") or "").strip()
+    ]
+
+    if not tasks:
+        return {}
+
+    results = await asyncio.gather(*tasks)
+    return {index: attachment for index, attachment in results}
+
+
+async def _load_user_attachment_paths(
+    user_id: str,
+    access_token: str,
+) -> list[str]:
+    def _select():
+        return (
+            get_supabase_client(access_token)
+            .table("chat_history")
+            .select("attachment_path")
+            .eq("user_id", user_id)
+            .eq("attachment_type", "image")
+            .execute()
+        )
+
+    response = await _run_with_retry("load_user_attachment_paths", _select, timeout_sec=6.0)
+    rows = getattr(response, "data", []) or []
+    paths: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        path = str(row.get("attachment_path") or "").strip()
+        if path:
+            paths.append(path)
+    return paths
+
+
+async def _delete_storage_objects(
+    *,
+    access_token: str,
+    object_paths: list[str],
+) -> None:
+    unique_paths = list(dict.fromkeys(path for path in object_paths if path))
+    if not unique_paths:
+        return
+
+    for start in range(0, len(unique_paths), STORAGE_REMOVE_BATCH_SIZE):
+        batch = unique_paths[start : start + STORAGE_REMOVE_BATCH_SIZE]
+
+        def _remove_batch():
+            return (
+                get_supabase_client(access_token)
+                .storage
+                .from_(CHAT_IMAGE_BUCKET)
+                .remove(batch)
+            )
+
+        await _run_with_retry(
+            "delete_chat_image_objects",
+            _remove_batch,
+            timeout_sec=8.0,
+        )
 
 
 # ── Main endpoint ──────────────────────────────────────────────────────────────
@@ -505,9 +623,11 @@ async def get_chat_history(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user identifier")
 
     messages = await _load_recent_history(user_id, access_token, limit=min(limit, 100))
+    attachments_by_index = await _build_history_attachments_parallel(messages, access_token)
+
     formatted_messages: list[dict[str, Any]] = []
-    for m in messages:
-        attachment = await _build_history_attachment(m, access_token)
+    for i, m in enumerate(messages):
+        attachment = attachments_by_index.get(i)
         formatted_messages.append(
             {
                 "role": m.get("role"),
@@ -532,6 +652,19 @@ async def delete_chat_history(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing user identifier",
         )
+
+    try:
+        attachment_paths = await _load_user_attachment_paths(user_id, access_token)
+        await _delete_storage_objects(
+            access_token=access_token,
+            object_paths=attachment_paths,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to delete chat storage objects: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete chat image attachments",
+        ) from exc
 
     def _delete():
         return (
@@ -558,6 +691,7 @@ MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
+@router.post("/chat/image", response_model=ChatResponse)
 @router.post("/chat_with_image", response_model=ChatResponse)
 async def chat_with_image(
     message: str = Form(..., description="User's question about the image"),
@@ -578,6 +712,12 @@ async def chat_with_image(
         )
 
     image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty image upload is not allowed.",
+        )
+
     if len(image_bytes) > MAX_IMAGE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

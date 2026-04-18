@@ -99,7 +99,7 @@ class LLMService:
             config_kwargs["tools"] = tools
 
         # Build content — multimodal if image provided
-        if image_bytes:
+        if image_bytes is not None:
             contents = [
                 genai_types.Part.from_bytes(
                     data=image_bytes,
