@@ -6,17 +6,18 @@ GrowMate is a smart and friendly study partner, built as a Multi-Agent AI system
 
 ## 🧠 Architecture Overview
 
-GrowMate replaces unpredictable LLM reasoning with verifiable algorithmic foundations. The core functionality is driven by **4 Core Agents**:
-1. **Academic Agent**: Uses Bayesian Hypothesis Tracking & HTN Planning (Hierarchical Task Networks) with self-repair to diagnose root-cause knowledge gaps.
-2. **Empathy Agent**: Streams fast telemetry via WebSockets and uses Particle Filter State Estimation to track user exhaustion or confusion. 
-3. **Strategy Agent**: Uses Reinforcement Learning (Q-Learning) and long-term memory to adapt personalized learning paths.
-4. **Orchestrator**: Aggregates agent state, applies deterministic utility policy, monitors uncertainty, and triggers Human-in-the-Loop (HITL) escalation when confidence drops.
+GrowMate uses a dual-layer AI architecture, prioritizing verifiable algorithmic foundations for core decisions, augmented by optional LLM reasoning. The core functionality is driven by the following layers:
 
-The orchestration layer is now split into modular components under `backend/orchestrator/`:
-- `aggregator.py`: builds a normalized state embedding from academic/empathy/memory signals.
-- `policy.py`: deterministic utility scoring and action distribution.
-- `monitoring.py`: weighted uncertainty calculation and HITL threshold check.
-- `engine.py`: composes the above into one decision output contract.
+### 1. Deterministic Decision Layer
+- **Academic Agent (Bayesian Tracker)**: Uses Bayesian Hypothesis Tracking to diagnose root-cause knowledge gaps (`H01-H04`).
+- **Empathy Agent (Particle Filter)**: Streams fast telemetry via WebSockets and uses Particle Filter State Estimation to track user exhaustion, confusion, and uncertainty.
+- **Strategy Agent (Q-Learning)**: Uses Reinforcement Learning and episodic memory to adapt personalized learning paths.
+- **HTN Planner**: Handles hierarchical task network planning for complex, multi-step workflows with safe fallbacks and self-repair.
+- **Orchestration Engine**: Aggregates agent state, applies deterministic utility policy, monitors uncertainty, and triggers Human-in-the-Loop (HITL) escalation when confidence drops. It is modularized into `aggregator.py`, `policy.py`, `monitoring.py`, and `engine.py` within `backend/orchestrator/`.
+
+### 2. Agentic Reasoning Layer (Optional)
+- **ReActEngine & LLMService**: Deep tool-calling reasoning using Gemini (via `google-genai`) to refine content, access RAG (`knowledge_chunks`), and address edge cases when enabled.
+- **ReflectionEngine**: Periodically reflects on session history to suggest long-term strategic changes.
 
 ## ⚙️ Tech Stack
 
@@ -84,12 +85,14 @@ This testing suite ensures that internal agent algorithms like the Bayesian Hypo
 
 ```text
 backend/
-├── agents/             # Logic for Core Agents
+├── agents/             # Logic for Core AI modules and layers
 │   ├── base.py         # Interfaces (IAgent, AgentInput, AgentOutput, SessionState)
 │   ├── orchestrator.py # AgenticOrchestrator pipeline loop
 │   ├── academic_agent/ # Bayesian Tracker & HTN Planner
 │   ├── empathy_agent/  # Particle Filter
-│   └── strategy_agent/ # Q-Learning
+│   ├── strategy_agent/ # Q-Learning
+│   ├── reasoning_loop.py # ReAct Engine logic
+│   └── reflection_engine.py # Strategic reflection
 ├── orchestrator/       # Modular orchestrator components (aggregator/policy/monitoring/engine)
 ├── api/
 │   ├── routes/         # REST endpoints (sessions, orchestrator, configs, inspection)
@@ -114,7 +117,7 @@ GrowMate prioritizes extreme **transparency** and **auditability**. The API feat
 Additional orchestration endpoint:
 - `POST /api/v1/orchestrator/step`: Runs one orchestrator decision step using session state + behavior signals.
 
-WebSocket channels:
+WebSocket channels (Require JWT via `Authorization` header or `token`/`access_token` query param):
 - `/ws/v1/behavior/{session_id}`: behavior telemetry ingestion.
 - `/ws/v1/dashboard/stream`: subscribe to all dashboard updates.
 - `/ws/v1/dashboard/stream/{session_id}`: subscribe to one session dashboard stream.
