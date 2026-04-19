@@ -1,10 +1,11 @@
 import json
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from agents.base import AgentInput
 from agents.empathy_agent.particle_filter import particle_filter
 from core.config import get_settings
+from core.security import get_current_user_ws
 
 router = APIRouter()
 settings = get_settings()
@@ -30,7 +31,12 @@ manager = ConnectionManager()
 
 
 @router.websocket("/{session_id}")
-async def behavior_websocket(websocket: WebSocket, session_id: str):
+async def behavior_websocket(
+    websocket: WebSocket,
+    session_id: str,
+    user: dict = Depends(get_current_user_ws),
+):
+    del user
     await manager.connect(websocket)
     try:
         while True:

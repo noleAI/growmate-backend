@@ -96,3 +96,15 @@ async def test_mastery_from_agent_state(monkeypatch) -> None:
     assert mastery["H02_ExpLog"] == 75
     assert mastery["H03_Chain"] == 85
     assert mastery["H04_Rules"] == 70
+
+
+@pytest.mark.asyncio
+async def test_helper_functions_are_callable() -> None:
+    assert await _noop_async() is None
+    assert await _empty_sessions() == []
+    assert await _empty_states() == []
+    assert await _xp_mid() == {"total_xp": 800, "current_streak": 2}
+    assert await _sessions_with_data() == ["sess-1", "sess-2"]
+    rows = await _state_rows()
+    assert isinstance(rows, list) and len(rows) == 2
+    assert await _xp_unused() == {"total_xp": 0, "current_streak": 0}
