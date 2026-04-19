@@ -272,7 +272,8 @@ Hãy trả về JSON với đúng 2 key:
         user_message: str,
         fallback: str = "Xin lỗi, mình chưa thể trả lời lúc này. Bạn thử lại sau nhé! 🙏",
         use_search: bool = True,
-    ) -> str:
+        return_metadata: bool = False,
+    ) -> str | dict[str, Any]:
         """
         Generate a free-form chat reply with optional Google Search grounding.
 
@@ -283,8 +284,15 @@ Hãy trả về JSON với đúng 2 key:
             fallback: Returned when the model is unavailable.
             use_search: Enable Google Search grounding (default True).
         """
+        processing: dict[str, Any] = {
+            "search_requested": use_search,
+            "used_search": False,
+        }
+
         if not self._ready:
             logger.warning("Client not initialized (%s), returning fallback.", self._init_error)
+            if return_metadata:
+                return {"reply": fallback, "processing": processing}
             return fallback
 
         # Build prompt
@@ -307,6 +315,7 @@ Hãy trả về JSON với đúng 2 key:
             try:
                 from google.genai import types as genai_types  # type: ignore[import]
                 tools = [genai_types.Tool(google_search=genai_types.GoogleSearch())]
+                processing["used_search"] = True
                 logger.debug("Google Search grounding enabled.")
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Could not build search tool: %s", exc)
@@ -325,9 +334,13 @@ Hãy trả về JSON với đúng 2 key:
                 "Chat response generated%s.",
                 " with Google Search" if tools else "",
             )
+            if return_metadata:
+                return {"reply": raw, "processing": processing}
             return raw
         except Exception as exc:  # noqa: BLE001
             logger.exception("generate_chat_response failed: %s", exc)
+            if return_metadata:
+                return {"reply": fallback, "processing": processing}
             return fallback
 
     # ------------------------------------------------------------------
@@ -341,7 +354,8 @@ Hãy trả về JSON với đúng 2 key:
         image_bytes: bytes,
         image_mime_type: str = "image/jpeg",
         fallback: str = "Xin lỗi, mình chưa thể phân tích ảnh lúc này. Bạn thử lại sau nhé! 🙏",
-    ) -> str:
+        return_metadata: bool = False,
+    ) -> str | dict[str, Any]:
         """
         Analyze an image and respond to the user's question about it.
 
@@ -352,8 +366,15 @@ Hãy trả về JSON với đúng 2 key:
             image_mime_type: MIME type of the image.
             fallback: Returned when the model is unavailable.
         """
+        processing: dict[str, Any] = {
+            "image_analyzed": True,
+            "image_mime_type": image_mime_type,
+        }
+
         if not self._ready:
             logger.warning("Client not initialized (%s), returning fallback.", self._init_error)
+            if return_metadata:
+                return {"reply": fallback, "processing": processing}
             return fallback
 
         vision_prompt = (
@@ -377,9 +398,13 @@ Hãy trả về JSON với đúng 2 key:
             if not raw:
                 raise ValueError("Empty response from model")
             logger.info("Vision chat response generated successfully.")
+            if return_metadata:
+                return {"reply": raw, "processing": processing}
             return raw
         except Exception as exc:  # noqa: BLE001
             logger.exception("generate_chat_response_with_image failed: %s", exc)
+            if return_metadata:
+                return {"reply": fallback, "processing": processing}
             return fallback
 
     # ------------------------------------------------------------------

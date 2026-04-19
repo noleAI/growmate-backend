@@ -227,3 +227,113 @@ async def test_update_session_not_found(monkeypatch) -> None:
         )
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_create_session_reuses_pending_session_with_resume_fields(monkeypatch) -> None:
+    async def _pending_stub(**kwargs):
+        assert kwargs["student_id"] == "student-1"
+        return {
+            "id": "sess-existing",
+            "status": "active",
+            "start_time": "2026-04-19T10:00:00+00:00",
+            "last_question_index": 3,
+            "total_questions": 10,
+            "progress_percent": 30,
+            "state_snapshot": {
+                "mode": "exam_prep",
+                "user_classification_level": "advanced",
+                "strategy_state": {
+                    "mode": "exam_prep",
+                    "classification_level": "advanced",
+                },
+            },
+        }
+
+    monkeypatch.setattr(
+        session_route,
+        "get_latest_active_learning_session",
+        _pending_stub,
+    )
+    monkeypatch.setattr(
+        session_route.memory_store,
+        "get_session_state",
+        lambda session_id: {
+            "subject": "math",
+            "topic": "derivatives",
+            "beliefs": {"understand_derivative": 0.6},
+        },
+    )
+    monkeypatch.setattr(
+        session_route.memory_store,
+        "save_session_state",
+        lambda session_id, state: None,
+    )
+
+    result = await session_route.create_session(
+        request=session_route.SessionCreateRequest(
+            subject="math",
+            topic="derivatives",
+            mode="exam_prep",
+        ),
+        user={"sub": "student-1"},
+        access_token="token",
+    )
+
+    assert result.session_id == "sess-existing"
+    assert result.reused_existing_session is True
+    assert result.initial_state["mode"] == "exam_prep"
+    assert result.initial_state["classification_level"] == "advanced"
+    assert result.initial_state["last_question_index"] == 3
+    assert result.initial_state["progress_percent"] == 30
+    assert result.initial_state["total_questions"] == 10
+    assert result.initial_state["strategy_state"]["last_question_index"] == 3
+
+
+@pytest.mark.asyncio
+async def test_create_session_fresh_response_includes_progress_defaults(monkeypatch) -> None:
+    async def _pending_stub(**kwargs):
+        del kwargs
+        return None
+
+    async def _count_stub(**kwargs) -> int:
+        del kwargs
+        return 0
+
+    async def _insert_stub(**kwargs):
+        del kwargs
+        return None
+
+    async def _progress_stub(**kwargs):
+        del kwargs
+        return None
+
+    monkeypatch.setattr(
+        session_route,
+        "get_latest_active_learning_session",
+        _pending_stub,
+    )
+    monkeypatch.setattr(session_route, "count_daily_learning_sessions", _count_stub)
+    monkeypatch.setattr(session_route, "insert_learning_session", _insert_stub)
+    monkeypatch.setattr(
+        session_route,
+        "update_learning_session_progress",
+        _progress_stub,
+    )
+
+    result = await session_route.create_session(
+        request=session_route.SessionCreateRequest(
+            subject="math",
+            topic="limits",
+            mode="explore",
+        ),
+        user={"sub": "student-2"},
+        access_token="token",
+    )
+
+    assert result.status == "active"
+    assert result.reused_existing_session is False
+    assert result.initial_state["mode"] == "explore"
+    assert result.initial_state["last_question_index"] == 0
+    assert result.initial_state["progress_percent"] == 0
+    assert result.initial_state["total_questions"] == 10

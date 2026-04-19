@@ -123,10 +123,83 @@ class ChatRequest(BaseModel):
     history: list[HistoryItem] = Field(default_factory=list)
 
 
+class ChatProcessingInfo(BaseModel):
+    mode: str = Field(..., pattern="^(text|image)$")
+    summary: str
+    tags: list[str] = Field(default_factory=list)
+    history_source: str | None = None
+    history_turns_used: int = 0
+    used_search: bool = False
+    image_analyzed: bool = False
+
+
 class ChatResponse(BaseModel):
     reply: str
     is_blocked: bool = False
     remaining_quota: int
+    processing: ChatProcessingInfo | None = None
+
+
+def _build_text_chat_processing(
+    *,
+    history_source: str,
+    history_turns_used: int,
+    used_search: bool,
+) -> ChatProcessingInfo:
+    tags: list[str] = []
+
+    if history_source == "database":
+        tags.append("Lịch sử chat")
+    elif history_source == "request":
+        tags.append("Ngữ cảnh từ app")
+    else:
+        tags.append("Không dùng lịch sử")
+
+    if history_turns_used > 0:
+        tags.append(f"{history_turns_used} lượt ngữ cảnh")
+
+    if used_search:
+        tags.append("Google Search")
+
+    if history_source == "database":
+        base_summary = "Đã dùng lịch sử chat gần đây"
+    elif history_source == "request":
+        base_summary = "Đã dùng ngữ cảnh hội thoại mà ứng dụng vừa gửi"
+    else:
+        base_summary = "Đã trả lời trực tiếp từ câu hỏi hiện tại"
+
+    if used_search:
+        summary = f"{base_summary} và Google Search để soạn câu trả lời."
+    elif history_source == "none":
+        summary = f"{base_summary}."
+    else:
+        summary = f"{base_summary} để soạn câu trả lời."
+
+    return ChatProcessingInfo(
+        mode="text",
+        summary=summary,
+        tags=tags,
+        history_source=history_source,
+        history_turns_used=history_turns_used,
+        used_search=used_search,
+        image_analyzed=False,
+    )
+
+
+def _build_image_chat_processing(*, image_mime_type: str | None = None) -> ChatProcessingInfo:
+    tags = ["Phân tích ảnh"]
+    if image_mime_type:
+        tags.append(image_mime_type.replace("image/", "").upper())
+
+    return ChatProcessingInfo(
+        mode="image",
+        summary="Đã phân tích ảnh bạn gửi và tạo câu trả lời từ nội dung trong ảnh.",
+        tags=tags,
+        history_source=None,
+        history_turns_used=0,
+        used_search=False,
+        image_analyzed=True,
+    )
 
 
 # ── Supabase helpers ───────────────────────────────────────────────────────────
@@ -541,16 +614,33 @@ async def chat(
     else:
         history_turns = [{"role": h.role, "content": h.content} for h in body.history]
 
+    history_source = "database" if db_history else ("request" if body.history else "none")
+
     # Trim to rolling window
     history_turns = history_turns[-(MAX_HISTORY_TURNS * 2):]
 
 
     # ── 3. Build prompt and call LLM ──────────────────────────────────────
     llm = _get_llm()
-    reply = await llm.generate_chat_response(
+    llm_result = await llm.generate_chat_response(
         system_prompt=_build_system_prompt(),   # ← injects current date/time
         history=history_turns,
         user_message=body.message,
+        return_metadata=True,
+    )
+    if isinstance(llm_result, dict):
+        reply = str(llm_result.get("reply") or "")
+        llm_processing = llm_result.get("processing")
+    else:
+        reply = str(llm_result)
+        llm_processing = None
+
+    processing = _build_text_chat_processing(
+        history_source=history_source,
+        history_turns_used=len(history_turns),
+        used_search=bool(
+            isinstance(llm_processing, dict) and llm_processing.get("used_search")
+        ),
     )
 
     # ── 4. Persist & update quota (best-effort, don't fail response) ────
@@ -571,7 +661,11 @@ async def chat(
 
 
     remaining = _remaining_quota(used)
-    return ChatResponse(reply=reply, remaining_quota=remaining)
+    return ChatResponse(
+        reply=reply,
+        remaining_quota=remaining,
+        processing=processing,
+    )
 
 
 @router.get("/quota")
@@ -760,11 +854,26 @@ async def chat_with_image(
 
     # Call vision LLM
     llm = _get_llm()
-    reply = await llm.generate_chat_response_with_image(
+    llm_result = await llm.generate_chat_response_with_image(
         system_prompt=_build_system_prompt(),
         user_message=message,
         image_bytes=image_bytes,
         image_mime_type=image.content_type or "image/jpeg",
+        return_metadata=True,
+    )
+    if isinstance(llm_result, dict):
+        reply = str(llm_result.get("reply") or "")
+        llm_processing = llm_result.get("processing")
+    else:
+        reply = str(llm_result)
+        llm_processing = None
+
+    processing = _build_image_chat_processing(
+        image_mime_type=(
+            str(llm_processing.get("image_mime_type"))
+            if isinstance(llm_processing, dict)
+            else image.content_type
+        ),
     )
 
     # Persist & update quota (best-effort)
@@ -790,4 +899,8 @@ async def chat_with_image(
         logger.warning("Failed to increment quota for image chat: %s", exc)
 
     remaining = _remaining_quota(used)
-    return ChatResponse(reply=reply, remaining_quota=remaining)
+    return ChatResponse(
+        reply=reply,
+        remaining_quota=remaining,
+        processing=processing,
+    )
