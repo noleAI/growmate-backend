@@ -15,8 +15,8 @@ from core.supabase_client import (
     get_user_profile,
     get_user_xp,
     list_all_user_xp_rows,
-    list_user_profiles_by_ids,
     list_user_badges,
+    list_user_profiles_by_ids,
     list_user_xp_rows,
     upsert_user_xp,
 )
@@ -172,8 +172,9 @@ async def get_leaderboard(
         rows = await list_user_xp_rows(
             period=normalized_period,
             limit=limit,
+            access_token=access_token,
         )
-        total_players = await count_user_xp_rows()
+        total_players = await count_user_xp_rows(access_token=access_token)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -184,6 +185,7 @@ async def get_leaderboard(
         *[
             list_user_badges(
                 user_id=str(row.get("user_id", "")),
+                access_token=access_token,
             )
             for row in rows
         ]
@@ -193,6 +195,7 @@ async def get_leaderboard(
     try:
         profiles_by_id = await list_user_profiles_by_ids(
             user_ids=user_ids,
+            access_token=access_token,
         )
     except Exception:
         profiles_by_id = {}
