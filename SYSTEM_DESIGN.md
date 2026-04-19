@@ -309,7 +309,7 @@ flowchart TD
 - Bộ test bao phủ unit, integration, orchestrator, empathy, strategy, benchmark.
 
 - CI/CD & Deploy hiện có:
-- Kiểm thử (GitHub Actions): Workflow `.github/workflows/backend-test.yml` chạy khi push `main` và `workflow_dispatch` để cài dependency, chạy `pytest` với coverage gate tối thiểu 90%.
+- Kiểm thử (GitHub Actions): Workflow `.github/workflows/backend-test.yml` chạy khi push `main` và `workflow_dispatch` để cài dependency, chạy `pytest` với coverage gate tối thiểu 80%.
 - Triển khai (Cloud Build / Cloud Run Integration): Chế độ Continuous Deployment được cấu hình trực tiếp với Google Cloud Run. Hệ thống tự động kích hoạt tiến trình build Docker image và deploy dịch vụ mỗi khi có commit mới vào nhánh `main` (hiển thị dưới dạng status check trên GitHub).
 
 - Biến môi trường chính:
@@ -327,7 +327,7 @@ flowchart LR
     D1[Dev Push main] --> C1[GitHub Actions]
     C1 --> C2[Setup Python 3.11]
     C2 --> C3[Install requirements]
-    C3 --> C4[Run pytest + coverage >= 90%]
+    C3 --> C4[Run pytest + coverage >= 80%]
 
     C4 --> R1[Ready for release gate]
     R1 --> D2[Build Docker image]
