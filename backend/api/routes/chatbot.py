@@ -65,6 +65,8 @@ _ALLOWED_IMAGE_EXTENSION_BY_MIME = {
     "image/webp": "webp",
     "image/gif": "gif",
 }
+CHAT_TEXT_FALLBACK = "Xin lỗi, mình chưa thể trả lời lúc này. Bạn thử lại sau nhé! 🙏"
+CHAT_IMAGE_FALLBACK = "Xin lỗi, mình chưa thể phân tích ảnh lúc này. Bạn thử lại sau nhé! 🙏"
 
 # ── System prompt ──────────────────────────────────────────────────────────────
 _SYSTEM_PROMPT_TEMPLATE = """Bạn là GrowMate AI — gia sư trực tuyến thông minh dành riêng cho học sinh THPT Việt Nam (lớp 10, 11, 12).
@@ -106,10 +108,11 @@ def _is_quota_exceeded(used: int) -> bool:
     return used >= DAILY_CHAT_LIMIT_FREE
 
 
-def _remaining_quota(used: int) -> int:
+def _remaining_quota(used: int, *, consume_request: bool = True) -> int:
     if CHAT_QUOTA_UNLIMITED:
         return UNLIMITED_REMAINING_QUOTA
-    return max(0, DAILY_CHAT_LIMIT_FREE - used - 1)
+    consumed = 1 if consume_request else 0
+    return max(0, DAILY_CHAT_LIMIT_FREE - used - consumed)
 
 
 # ── Pydantic schemas ───────────────────────────────────────────────────────────
@@ -551,7 +554,11 @@ async def chat(
         system_prompt=_build_system_prompt(),   # ← injects current date/time
         history=history_turns,
         user_message=body.message,
+        fallback=CHAT_TEXT_FALLBACK,
     )
+    fallback_used = reply.strip() == CHAT_TEXT_FALLBACK
+    if fallback_used:
+        logger.warning("Chat fallback response returned; skipping quota increment for user %s", user_id)
 
     # ── 4. Persist & update quota (best-effort, don't fail response) ────
     try:
@@ -559,18 +566,19 @@ async def chat(
     except Exception as exc:
         logger.warning("Failed to save chat messages: %s", exc)
 
-    try:
-        await increment_user_token_usage(
-            user_id=user_id,
-            tokens_used=len(body.message) + len(reply),
-            usage_date=now_local.date(),
-            access_token=access_token,
-        )
-    except Exception as exc:
-        logger.warning("Failed to increment quota: %s", exc)
+    if not fallback_used:
+        try:
+            await increment_user_token_usage(
+                user_id=user_id,
+                tokens_used=len(body.message) + len(reply),
+                usage_date=now_local.date(),
+                access_token=access_token,
+            )
+        except Exception as exc:
+            logger.warning("Failed to increment quota: %s", exc)
 
 
-    remaining = _remaining_quota(used)
+    remaining = _remaining_quota(used, consume_request=not fallback_used)
     return ChatResponse(reply=reply, remaining_quota=remaining)
 
 
@@ -765,7 +773,11 @@ async def chat_with_image(
         user_message=message,
         image_bytes=image_bytes,
         image_mime_type=image.content_type or "image/jpeg",
+        fallback=CHAT_IMAGE_FALLBACK,
     )
+    fallback_used = reply.strip() == CHAT_IMAGE_FALLBACK
+    if fallback_used:
+        logger.warning("Image chat fallback response returned; skipping quota increment for user %s", user_id)
 
     # Persist & update quota (best-effort)
     try:
@@ -779,15 +791,16 @@ async def chat_with_image(
     except Exception as exc:
         logger.warning("Failed to save image chat messages: %s", exc)
 
-    try:
-        await increment_user_token_usage(
-            user_id=user_id,
-            tokens_used=len(message) + len(reply) + 500,  # extra for image tokens
-            usage_date=now_local.date(),
-            access_token=access_token,
-        )
-    except Exception as exc:
-        logger.warning("Failed to increment quota for image chat: %s", exc)
+    if not fallback_used:
+        try:
+            await increment_user_token_usage(
+                user_id=user_id,
+                tokens_used=len(message) + len(reply) + 500,  # extra for image tokens
+                usage_date=now_local.date(),
+                access_token=access_token,
+            )
+        except Exception as exc:
+            logger.warning("Failed to increment quota for image chat: %s", exc)
 
-    remaining = _remaining_quota(used)
+    remaining = _remaining_quota(used, consume_request=not fallback_used)
     return ChatResponse(reply=reply, remaining_quota=remaining)

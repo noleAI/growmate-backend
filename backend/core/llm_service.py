@@ -104,7 +104,11 @@ class LLMService:
     """Thin wrapper around google-genai SDK (Vertex AI backend)."""
 
     def __init__(self) -> None:
-        self.gcp_project_id = os.getenv("GCP_PROJECT_ID", "")
+        self.gcp_project_id = (
+            os.getenv("GCP_PROJECT_ID", "").strip()
+            or os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+            or os.getenv("GCLOUD_PROJECT", "").strip()
+        )
         self.gcp_location = os.getenv("GCP_LOCATION", "us-central1")
         self.model_name = os.getenv("VERTEX_MODEL_NAME", "gemini-2.5-flash")
         self._client: Any = None
@@ -311,22 +315,44 @@ Hãy trả về JSON với đúng 2 key:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Could not build search tool: %s", exc)
 
-        try:
+        async def _request(*, request_tools: list | None) -> str:
             raw = await asyncio.to_thread(
                 self._call_model,
                 full_prompt,
                 temperature=0.7,
                 max_tokens=1024,
-                tools=tools,
+                tools=request_tools,
             )
             if not raw:
                 raise ValueError("Empty response from model")
+            return raw
+
+        try:
+            raw = await _request(request_tools=tools)
             logger.info(
                 "Chat response generated%s.",
                 " with Google Search" if tools else "",
             )
             return raw
         except Exception as exc:  # noqa: BLE001
+            if tools:
+                # Some deployments/models reject Google Search tool config.
+                # Retry once without tools before giving up.
+                logger.warning(
+                    "Chat generation with Google Search failed (%s); retrying without search.",
+                    exc,
+                )
+                try:
+                    raw = await _request(request_tools=None)
+                    logger.info("Chat response generated after retry without Google Search.")
+                    return raw
+                except Exception as retry_exc:  # noqa: BLE001
+                    logger.exception(
+                        "generate_chat_response retry without search failed: %s",
+                        retry_exc,
+                    )
+                    return fallback
+
             logger.exception("generate_chat_response failed: %s", exc)
             return fallback
 

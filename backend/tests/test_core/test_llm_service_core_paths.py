@@ -9,6 +9,8 @@ from core.llm_service import LLMService
 
 def _service_with_no_model(monkeypatch: pytest.MonkeyPatch) -> LLMService:
     monkeypatch.delenv("GCP_PROJECT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("GCLOUD_PROJECT", raising=False)
     return LLMService()
 
 
@@ -145,6 +147,61 @@ async def test_generate_chat_response_exception_returns_fallback(
         user_message="q",
         fallback="fb",
         use_search=False,
+    )
+
+    assert result == "fb"
+
+
+@pytest.mark.asyncio
+async def test_generate_chat_response_retries_without_search_on_tool_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service_with_no_model(monkeypatch)
+    _mark_ready(service)
+
+    calls: list[list | None] = []
+
+    def _call_model(*_args: Any, **kwargs: Any) -> str:
+        tools = kwargs.get("tools")
+        calls.append(tools)
+        if tools is not None:
+            raise RuntimeError("search tool unsupported")
+        return "assistant-retry-answer"
+
+    monkeypatch.setattr(service, "_call_model", _call_model)
+
+    result = await service.generate_chat_response(
+        system_prompt="sys",
+        history=[],
+        user_message="q",
+        fallback="fb",
+        use_search=True,
+    )
+
+    assert result == "assistant-retry-answer"
+    assert len(calls) == 2
+    assert calls[0] is not None
+    assert calls[1] is None
+
+
+@pytest.mark.asyncio
+async def test_generate_chat_response_retries_without_search_then_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service_with_no_model(monkeypatch)
+    _mark_ready(service)
+
+    def _raise(*_args: Any, **_kwargs: Any) -> str:
+        raise RuntimeError("model error")
+
+    monkeypatch.setattr(service, "_call_model", _raise)
+
+    result = await service.generate_chat_response(
+        system_prompt="sys",
+        history=[],
+        user_message="q",
+        fallback="fb",
+        use_search=True,
     )
 
     assert result == "fb"
