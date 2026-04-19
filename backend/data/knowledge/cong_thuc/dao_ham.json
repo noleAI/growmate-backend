@@ -2,19 +2,19 @@
   {
     "chapter": "dao_ham",
     "section": "luong_giac",
-    "content": "Công thức nhanh: $(\\sin x)' = \\cos x$, $(\\cos x)' = -\\sin x$, $(\\tan x)' = \\dfrac{1}{\\cos^2 x}$.",
-    "latex": "(\\sin x)' = \\cos x,\\quad (\\cos x)' = -\\sin x,\\quad (\\tan x)' = \\dfrac{1}{\\cos^2 x}"
+    "content": "Công thức nhanh: $(\\sin x)^{\\prime} = \\cos x$, $(\\cos x)^{\\prime} = -\\sin x$, $(\\tan x)^{\\prime} = \\sec^2 x$.",
+    "latex": "$(\\sin x)^{\\prime} = \\cos x,\\quad (\\cos x)^{\\prime} = -\\sin x,\\quad (\\tan x)^{\\prime} = \\sec^2 x$"
   },
   {
     "chapter": "dao_ham",
     "section": "ham_mu_logarit",
-    "content": "Công thức nhanh: $(e^x)' = e^x$, $(a^x)' = a^x \\ln(a)$, $(\\ln x)' = \\dfrac{1}{x}$.",
-    "latex": "(e^x)' = e^x,\\quad (a^x)' = a^x \\ln(a),\\quad (\\ln x)' = \\dfrac{1}{x}"
+    "content": "Công thức nhanh: $(e^x)^{\\prime} = e^x$, $(a^x)^{\\prime} = a^x \\ln a$, $(\\ln x)^{\\prime} = \\dfrac{1}{x}$.",
+    "latex": "$(e^x)^{\\prime} = e^x,\\quad (a^x)^{\\prime} = a^x \\ln a,\\quad (\\ln x)^{\\prime} = \\dfrac{1}{x}$"
   },
   {
     "chapter": "dao_ham",
     "section": "chain_rule",
-    "content": "Nếu $y = f(g(x))$ thì $y' = f'(g(x))\\cdot g'(x)$. Luôn nhớ nhân với đạo hàm lớp trong.",
-    "latex": "\\text{Nếu } y = f(g(x)) \\text{ thì } y' = f'(g(x))\\cdot g'(x)"
+    "content": "Nếu $y = f(g(x))$ thì $y^{\\prime} = f^{\\prime}(g(x))\\cdot g^{\\prime}(x)$. Luôn nhớ nhân với đạo hàm lớp trong.",
+    "latex": "$\\text{Nếu } y = f(g(x)) \\text{ thì } y^{\\prime} = f^{\\prime}(g(x)) \\cdot g^{\\prime}(x)$"
   }
 ]
