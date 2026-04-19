@@ -88,10 +88,15 @@ def _sanitize_attempt(attempt: dict[str, Any]) -> dict[str, Any]:
         or attempt.get("question_template_id")
         or ""
     )
+    review_material = quiz_service.get_question_review_material(question_id)
+    answer_key = review_material.get("answer_key") if isinstance(review_material.get("answer_key"), dict) else {}
     return {
         "question_id": question_id,
         "question_template_id": str(attempt.get("question_template_id") or ""),
         "question_type": str(attempt.get("question_type") or ""),
+        "question_content": str(review_material.get("content") or ""),
+        "media_url": review_material.get("media_url"),
+        "answer_key": answer_key,
         "is_correct": bool(attempt.get("is_correct", False)),
         "score": float(attempt.get("score") or 0.0),
         "max_score": float(attempt.get("max_score") or 0.0),

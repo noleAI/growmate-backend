@@ -175,6 +175,12 @@ async def test_get_quiz_result_uses_snapshot_data() -> None:
     assert result["session_status"] == "completed"
     assert result["summary"]["answered_count"] == 3
     assert len(result["attempts"]) == 1
+    attempt = result["attempts"][0]
+    assert attempt["question_content"] == quiz_service._question_by_id["MATH_DERIV_1"]["content"]
+    assert attempt["answer_key"]["kind"] == "multiple_choice"
+    assert attempt["answer_key"]["correct_option_id"] == str(
+        quiz_service._question_by_id["MATH_DERIV_1"]["payload"]["correct_option_id"]
+    )
 
 
 @pytest.mark.asyncio
@@ -222,6 +228,7 @@ async def test_get_quiz_result_fallback_attempt_restores_question_id() -> None:
     assert result["status"] == "ok"
     assert len(result["attempts"]) == 1
     assert result["attempts"][0]["question_id"] == "MATH_DERIV_1"
+    assert result["attempts"][0]["answer_key"]["kind"] == "multiple_choice"
 
 
 @pytest.mark.asyncio
