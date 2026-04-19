@@ -172,9 +172,8 @@ async def get_leaderboard(
         rows = await list_user_xp_rows(
             period=normalized_period,
             limit=limit,
-            access_token=access_token,
         )
-        total_players = await count_user_xp_rows(access_token=access_token)
+        total_players = await count_user_xp_rows()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -185,7 +184,6 @@ async def get_leaderboard(
         *[
             list_user_badges(
                 user_id=str(row.get("user_id", "")),
-                access_token=access_token,
             )
             for row in rows
         ]
@@ -195,7 +193,6 @@ async def get_leaderboard(
     try:
         profiles_by_id = await list_user_profiles_by_ids(
             user_ids=user_ids,
-            access_token=access_token,
         )
     except Exception:
         profiles_by_id = {}
@@ -235,7 +232,6 @@ async def get_my_rank(
     try:
         ranked_rows = await list_all_user_xp_rows(
             period=normalized_period,
-            access_token=access_token,
         )
         badges = await list_user_badges(
             user_id=user_id,
@@ -281,9 +277,34 @@ async def add_xp(
 ):
     user_id = _require_user_id(user)
     today = datetime.now(VN_TZ).date()
+    event_type = str(request.event_type or "").strip().lower()
 
     try:
-        xp_breakdown = calculate_xp(request.event_type, request.extra_data)
+        current = await get_user_xp(user_id=user_id, access_token=access_token)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load current xp: {exc}",
+        ) from exc
+
+    last_active = parse_iso_date(current.get("last_active_date"))
+    if event_type == "daily_login" and last_active == today:
+        return {
+            "xp_added": 0,
+            "breakdown": {
+                "base_xp": 0,
+                "streak_bonus": 0,
+                "speed_bonus": 0,
+                "total_xp": 0,
+            },
+            "weekly_xp": _as_int(current.get("weekly_xp")),
+            "total_xp": _as_int(current.get("total_xp")),
+            "current_streak": _as_int(current.get("current_streak")),
+            "new_badges": [],
+        }
+
+    try:
+        xp_breakdown = calculate_xp(event_type, request.extra_data)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -291,18 +312,15 @@ async def add_xp(
         ) from exc
 
     try:
-        current = await get_user_xp(user_id=user_id, access_token=access_token)
-
         current_streak = _as_int(current.get("current_streak"))
         longest_streak = _as_int(current.get("longest_streak"))
-        last_active = parse_iso_date(current.get("last_active_date"))
 
         streak_state = resolve_streak_update(
             current_streak=current_streak,
             longest_streak=longest_streak,
             last_active_date=last_active,
             today=today,
-            event_type=request.event_type,
+            event_type=event_type,
         )
 
         next_weekly_xp = _as_int(current.get("weekly_xp")) + xp_breakdown["total_xp"]
