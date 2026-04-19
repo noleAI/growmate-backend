@@ -2,9 +2,9 @@
   {
     "id": "constant_derivative",
     "title": "Đạo hàm hằng số",
-    "latex": "$(c)^{\\prime} = 0$",
+    "latex": "(c)^{\\prime} = 0",
     "explanation": "Đạo hàm của một hằng số bằng 0.",
-    "example": "$(7)^{\\prime} = 0$",
+    "example": "(7)^{\\prime} = 0",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -16,9 +16,9 @@
   {
     "id": "power_rule",
     "title": "Quy tắc lũy thừa",
-    "latex": "$(x^n)^{\\prime} = n x^{n - 1}$",
+    "latex": "(x^n)^{\\prime} = n x^{n - 1}",
     "explanation": "Lấy đạo hàm lũy thừa bằng cách nhân với số mũ rồi giảm số mũ đi 1.",
-    "example": "$(x^5)^{\\prime} = 5x^4$",
+    "example": "(x^5)^{\\prime} = 5x^4",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -30,9 +30,9 @@
   {
     "id": "linear_derivative",
     "title": "Đạo hàm hàm bậc nhất",
-    "latex": "$(ax + b)^{\\prime} = a$",
+    "latex": "(ax + b)^{\\prime} = a",
     "explanation": "Hệ số góc của hàm bậc nhất là hằng số.",
-    "example": "$(3x-2)^{\\prime} = 3$",
+    "example": "(3x-2)^{\\prime} = 3",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -44,9 +44,9 @@
   {
     "id": "root_derivative",
     "title": "Đạo hàm căn bậc hai",
-    "latex": "$(\\sqrt{x})^{\\prime} = \\dfrac{1}{2\\sqrt{x}}$",
+    "latex": "(\\sqrt{x})^{\\prime} = \\dfrac{1}{2\\sqrt{x}}",
     "explanation": "Đưa về dạng lũy thừa x^{\\dfrac{1}{2}} rồi áp dụng quy tắc lũy thừa.",
-    "example": "$(\\sqrt{3x})^{\\prime} = \\dfrac{3}{2\\sqrt{3x}}$",
+    "example": "(\\sqrt{3x})^{\\prime} = \\dfrac{3}{2\\sqrt{3x}}",
     "related_hypothesis": "H04_Rules",
     "difficulty": "medium",
     "keywords": [
@@ -58,9 +58,9 @@
   {
     "id": "reciprocal_derivative",
     "title": "Đạo hàm hàm nghịch đảo",
-    "latex": "$\\left(\\dfrac{1}{x}\\right)^{\\prime} = -\\dfrac{1}{x^2}$",
+    "latex": "\\left(\\dfrac{1}{x}\\right)^{\\prime} = -\\dfrac{1}{x^2}",
     "explanation": "Viết \\dfrac{1}{x} thành x^{-1} rồi áp dụng quy tắc lũy thừa.",
-    "example": "$\\left(\\dfrac{1}{x-1}\\right)^{\\prime} = -\\dfrac{1}{(x-1)^2}$",
+    "example": "\\left(\\dfrac{1}{x-1}\\right)^{\\prime} = -\\dfrac{1}{(x-1)^2}",
     "related_hypothesis": "H04_Rules",
     "difficulty": "medium",
     "keywords": [
@@ -72,9 +72,9 @@
   {
     "id": "sum_rule",
     "title": "Quy tắc tổng",
-    "latex": "$(u + v)^{\\prime} = u^{\\prime} + v^{\\prime}$",
+    "latex": "(u + v)^{\\prime} = u^{\\prime} + v^{\\prime}",
     "explanation": "Lấy đạo hàm từng hạng tử độc lập rồi cộng lại.",
-    "example": "$(x^2+\\sin x)^{\\prime} = 2x+\\cos x$",
+    "example": "(x^2+\\sin x)^{\\prime} = 2x+\\cos x",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -86,9 +86,9 @@
   {
     "id": "difference_rule",
     "title": "Quy tắc hiệu",
-    "latex": "$(u - v)^{\\prime} = u^{\\prime} - v^{\\prime}$",
+    "latex": "(u - v)^{\\prime} = u^{\\prime} - v^{\\prime}",
     "explanation": "Lấy đạo hàm từng hạng tử độc lập rồi trừ nhau.",
-    "example": "$(x^3-\\ln x)^{\\prime} = 3x^2-\\dfrac{1}{x}$",
+    "example": "(x^3-\\ln x)^{\\prime} = 3x^2-\\dfrac{1}{x}",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -100,9 +100,9 @@
   {
     "id": "product_rule",
     "title": "Quy tắc tích",
-    "latex": "$(uv)^{\\prime} = u^{\\prime}v + uv^{\\prime}$",
+    "latex": "(uv)^{\\prime} = u^{\\prime}v + uv^{\\prime}",
     "explanation": "Với tích hai hàm, cộng hai tích: đạo hàm hàm thứ nhất nhân hàm thứ hai và ngược lại.",
-    "example": "$(x^2e^x)^{\\prime} = 2xe^x + x^2e^x$",
+    "example": "(x^2e^x)^{\\prime} = 2xe^x + x^2e^x",
     "related_hypothesis": "H04_Rules",
     "difficulty": "medium",
     "keywords": [
@@ -114,9 +114,9 @@
   {
     "id": "quotient_rule",
     "title": "Quy tắc thương",
-    "latex": "$\\left(\\dfrac{u}{v}\\right)^{\\prime} = \\dfrac{u^{\\prime}v - uv^{\\prime}}{v^2}$",
+    "latex": "\\left(\\dfrac{u}{v}\\right)^{\\prime} = \\dfrac{u^{\\prime}v - uv^{\\prime}}{v^2}",
     "explanation": "Dùng quy tắc thương cho tỉ số của hai hàm khả vi.",
-    "example": "$\\left(\\dfrac{x+1}{x-2}\\right)^{\\prime} = \\dfrac{-3}{(x-2)^2}$",
+    "example": "\\left(\\dfrac{x+1}{x-2}\\right)^{\\prime} = \\dfrac{-3}{(x-2)^2}",
     "related_hypothesis": "H04_Rules",
     "difficulty": "medium",
     "keywords": [
@@ -128,9 +128,9 @@
   {
     "id": "polynomial_combo",
     "title": "Đạo hàm đa thức tổng hợp",
-    "latex": "$(ax^3 + bx^2 + cx + d)^{\\prime} = 3ax^2 + 2bx + c$",
+    "latex": "(ax^3 + bx^2 + cx + d)^{\\prime} = 3ax^2 + 2bx + c",
     "explanation": "Áp dụng tính tuyến tính và quy tắc lũy thừa cho từng hạng tử.",
-    "example": "$(2x^3-3x^2+5x+1)^{\\prime} = 6x^2-6x+5$",
+    "example": "(2x^3-3x^2+5x+1)^{\\prime} = 6x^2-6x+5",
     "related_hypothesis": "H04_Rules",
     "difficulty": "easy",
     "keywords": [
@@ -142,9 +142,9 @@
   {
     "id": "sin_derivative",
     "title": "Đạo hàm sin",
-    "latex": "$(\\sin x)^{\\prime} = \\cos x$",
+    "latex": "(\\sin x)^{\\prime} = \\cos x",
     "explanation": "Đẳng thức đạo hàm lượng giác cơ bản của sin.",
-    "example": "$(\\sin 3x)^{\\prime} = 3\\cos 3x$",
+    "example": "(\\sin 3x)^{\\prime} = 3\\cos 3x",
     "related_hypothesis": "H01_Trig",
     "difficulty": "easy",
     "keywords": [
@@ -156,9 +156,9 @@
   {
     "id": "cos_derivative",
     "title": "Đạo hàm cos",
-    "latex": "$(\\cos x)^{\\prime} = -\\sin x$",
+    "latex": "(\\cos x)^{\\prime} = -\\sin x",
     "explanation": "Đạo hàm của cos bằng âm sin.",
-    "example": "$(\\cos 2x)^{\\prime} = -2\\sin 2x$",
+    "example": "(\\cos 2x)^{\\prime} = -2\\sin 2x",
     "related_hypothesis": "H01_Trig",
     "difficulty": "easy",
     "keywords": [
@@ -170,9 +170,9 @@
   {
     "id": "tan_derivative",
     "title": "Đạo hàm tan",
-    "latex": "$(\\tan x)^{\\prime} = \\sec^2 x$",
+    "latex": "(\\tan x)^{\\prime} = \\sec^2 x",
     "explanation": "Đạo hàm của tan bằng sec bình phương.",
-    "example": "$(\\tan(5x))^{\\prime} = 5\\sec^2(5x)$",
+    "example": "(\\tan(5x))^{\\prime} = 5\\sec^2(5x)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "medium",
     "keywords": [
@@ -184,9 +184,9 @@
   {
     "id": "cot_derivative",
     "title": "Đạo hàm cot",
-    "latex": "$(\\cot x)^{\\prime} = -\\csc^2 x$",
+    "latex": "(\\cot x)^{\\prime} = -\\csc^2 x",
     "explanation": "Đạo hàm của cot bằng âm csc bình phương.",
-    "example": "$(\\cot(2x))^{\\prime} = -2\\csc^2(2x)$",
+    "example": "(\\cot(2x))^{\\prime} = -2\\csc^2(2x)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "medium",
     "keywords": [
@@ -198,9 +198,9 @@
   {
     "id": "sec_derivative",
     "title": "Đạo hàm sec",
-    "latex": "$(\\sec x)^{\\prime} = \\sec x \\tan x$",
+    "latex": "(\\sec x)^{\\prime} = \\sec x \\tan x",
     "explanation": "Công thức đạo hàm của sec.",
-    "example": "$(\\sec(4x))^{\\prime} = 4\\sec(4x)\\tan(4x)$",
+    "example": "(\\sec(4x))^{\\prime} = 4\\sec(4x)\\tan(4x)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "hard",
     "keywords": [
@@ -212,9 +212,9 @@
   {
     "id": "csc_derivative",
     "title": "Đạo hàm csc",
-    "latex": "$(\\csc x)^{\\prime} = -\\csc x \\cot x$",
+    "latex": "(\\csc x)^{\\prime} = -\\csc x \\cot x",
     "explanation": "Công thức đạo hàm của csc.",
-    "example": "$(\\csc(3x))^{\\prime} = -3\\csc(3x)\\cot(3x)$",
+    "example": "(\\csc(3x))^{\\prime} = -3\\csc(3x)\\cot(3x)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "hard",
     "keywords": [
@@ -226,9 +226,9 @@
   {
     "id": "sin_composite",
     "title": "Đạo hàm sin hàm hợp",
-    "latex": "$(\\sin(u(x)))^{\\prime} = \\cos(u(x))u^{\\prime}(x)$",
+    "latex": "(\\sin(u(x)))^{\\prime} = \\cos(u(x))u^{\\prime}(x)",
     "explanation": "Áp dụng chain rule cho hàm lượng giác dạng hợp.",
-    "example": "$(\\sin(x^2+1))^{\\prime} = 2x\\cos(x^2+1)$",
+    "example": "(\\sin(x^2+1))^{\\prime} = 2x\\cos(x^2+1)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "medium",
     "keywords": [
@@ -240,9 +240,9 @@
   {
     "id": "cos_composite",
     "title": "Đạo hàm cos hàm hợp",
-    "latex": "$(\\cos(u(x)))^{\\prime} = -\\sin(u(x))u^{\\prime}(x)$",
+    "latex": "(\\cos(u(x)))^{\\prime} = -\\sin(u(x))u^{\\prime}(x)",
     "explanation": "Áp dụng chain rule cho hàm cos dạng hợp.",
-    "example": "$(\\cos(3x^2))^{\\prime} = -6x\\sin(3x^2)$",
+    "example": "(\\cos(3x^2))^{\\prime} = -6x\\sin(3x^2)",
     "related_hypothesis": "H01_Trig",
     "difficulty": "medium",
     "keywords": [
@@ -254,9 +254,9 @@
   {
     "id": "exp_derivative",
     "title": "Đạo hàm e^x",
-    "latex": "$(e^x)^{\\prime} = e^x$",
+    "latex": "(e^x)^{\\prime} = e^x",
     "explanation": "Hàm mũ e^x có đạo hàm bằng chính nó.",
-    "example": "$(2e^x)^{\\prime} = 2e^x$",
+    "example": "(2e^x)^{\\prime} = 2e^x",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "easy",
     "keywords": [
@@ -268,9 +268,9 @@
   {
     "id": "a_pow_x_derivative",
     "title": "Đạo hàm a^x",
-    "latex": "$(a^x)^{\\prime} = a^x\\ln a$",
+    "latex": "(a^x)^{\\prime} = a^x\\ln a",
     "explanation": "Đạo hàm của hàm mũ cơ số a với a > 0 và a \\neq 1.",
-    "example": "$(5^x)^{\\prime} = 5^x\\ln 5$",
+    "example": "(5^x)^{\\prime} = 5^x\\ln 5",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "easy",
     "keywords": [
@@ -282,9 +282,9 @@
   {
     "id": "ln_derivative",
     "title": "Đạo hàm ln",
-    "latex": "$(\\ln x)^{\\prime} = \\dfrac{1}{x}$",
+    "latex": "(\\ln x)^{\\prime} = \\dfrac{1}{x}",
     "explanation": "Đạo hàm của logarit tự nhiên.",
-    "example": "$(\\ln(3x))^{\\prime} = \\dfrac{1}{x}$",
+    "example": "(\\ln(3x))^{\\prime} = \\dfrac{1}{x}",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "easy",
     "keywords": [
@@ -296,9 +296,9 @@
   {
     "id": "log_a_x_derivative",
     "title": "Đạo hàm log cơ số a",
-    "latex": "$(\\log_a x)^{\\prime} = \\dfrac{1}{x\\ln a}$",
+    "latex": "(\\log_a x)^{\\prime} = \\dfrac{1}{x\\ln a}",
     "explanation": "Đạo hàm của logarit cơ số a.",
-    "example": "$(\\log_2 x)^{\\prime} = \\dfrac{1}{x\\ln 2}$",
+    "example": "(\\log_2 x)^{\\prime} = \\dfrac{1}{x\\ln 2}",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "medium",
     "keywords": [
@@ -310,9 +310,9 @@
   {
     "id": "exp_composite",
     "title": "Đạo hàm hàm mũ hợp",
-    "latex": "$(e^{u(x)})^{\\prime} = e^{u(x)}u^{\\prime}(x)$",
+    "latex": "(e^{u(x)})^{\\prime} = e^{u(x)}u^{\\prime}(x)",
     "explanation": "Áp dụng chain rule cho hàm mũ của một hàm.",
-    "example": "$(e^{x^2})^{\\prime} = 2xe^{x^2}$",
+    "example": "(e^{x^2})^{\\prime} = 2xe^{x^2}",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "medium",
     "keywords": [
@@ -324,9 +324,9 @@
   {
     "id": "ln_composite",
     "title": "Đạo hàm ln hàm hợp",
-    "latex": "$(\\ln(u(x)))^{\\prime} = \\dfrac{u^{\\prime}(x)}{u(x)}$",
+    "latex": "(\\ln(u(x)))^{\\prime} = \\dfrac{u^{\\prime}(x)}{u(x)}",
     "explanation": "Áp dụng chain rule cho logarit tự nhiên của một hàm.",
-    "example": "$(\\ln(x^2+1))^{\\prime} = \\dfrac{2x}{x^2+1}$",
+    "example": "(\\ln(x^2+1))^{\\prime} = \\dfrac{2x}{x^2+1}",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "medium",
     "keywords": [
@@ -338,9 +338,9 @@
   {
     "id": "x_pow_x_derivative",
     "title": "Đạo hàm x^x",
-    "latex": "$(x^x)^{\\prime} = x^x(\\ln x + 1)$",
+    "latex": "(x^x)^{\\prime} = x^x(\\ln x + 1)",
     "explanation": "Dùng phương pháp lấy đạo hàm logarit.",
-    "example": "$(x^x)^{\\prime} = x^x(1+\\ln x)$",
+    "example": "(x^x)^{\\prime} = x^x(1+\\ln x)",
     "related_hypothesis": "H02_ExpLog",
     "difficulty": "hard",
     "keywords": [
@@ -352,9 +352,9 @@
   {
     "id": "chain_rule_general",
     "title": "Quy tắc chain rule tổng quát",
-    "latex": "$(f(g(x)))^{\\prime} = f^{\\prime}(g(x))g^{\\prime}(x)$",
+    "latex": "(f(g(x)))^{\\prime} = f^{\\prime}(g(x))g^{\\prime}(x)",
     "explanation": "Lấy đạo hàm hàm ngoài, giữ nguyên hàm trong, rồi nhân với đạo hàm hàm trong.",
-    "example": "$((3x+1)^5)^{\\prime} = 15(3x+1)^4$",
+    "example": "((3x+1)^5)^{\\prime} = 15(3x+1)^4",
     "related_hypothesis": "H03_Chain",
     "difficulty": "easy",
     "keywords": [
@@ -366,9 +366,9 @@
   {
     "id": "chain_square",
     "title": "Đạo hàm bình phương hàm hợp",
-    "latex": "$(u(x)^2)^{\\prime} = 2u(x)u^{\\prime}(x)$",
+    "latex": "(u(x)^2)^{\\prime} = 2u(x)u^{\\prime}(x)",
     "explanation": "Trường hợp đặc biệt của chain rule với lũy thừa 2.",
-    "example": "$((x^2+1)^2)^{\\prime} = 4x(x^2+1)$",
+    "example": "((x^2+1)^2)^{\\prime} = 4x(x^2+1)",
     "related_hypothesis": "H03_Chain",
     "difficulty": "easy",
     "keywords": [
@@ -380,9 +380,9 @@
   {
     "id": "chain_sqrt",
     "title": "Đạo hàm căn của hàm hợp",
-    "latex": "$(\\sqrt{u(x)})^{\\prime} = \\dfrac{u^{\\prime}(x)}{2\\sqrt{u(x)}}$",
+    "latex": "(\\sqrt{u(x)})^{\\prime} = \\dfrac{u^{\\prime}(x)}{2\\sqrt{u(x)}}",
     "explanation": "Kết hợp chain rule với công thức đạo hàm căn bậc hai.",
-    "example": "$(\\sqrt{x^2+4})^{\\prime} = \\dfrac{x}{\\sqrt{x^2+4}}$",
+    "example": "(\\sqrt{x^2+4})^{\\prime} = \\dfrac{x}{\\sqrt{x^2+4}}",
     "related_hypothesis": "H03_Chain",
     "difficulty": "medium",
     "keywords": [
@@ -394,9 +394,9 @@
   {
     "id": "chain_sin",
     "title": "Đạo hàm sin của hàm hợp",
-    "latex": "$(\\sin(u(x)))^{\\prime} = \\cos(u(x))u^{\\prime}(x)$",
+    "latex": "(\\sin(u(x)))^{\\prime} = \\cos(u(x))u^{\\prime}(x)",
     "explanation": "Áp dụng chain rule cho hàm sin.",
-    "example": "$(\\sin(2x^3))^{\\prime} = 6x^2\\cos(2x^3)$",
+    "example": "(\\sin(2x^3))^{\\prime} = 6x^2\\cos(2x^3)",
     "related_hypothesis": "H03_Chain",
     "difficulty": "medium",
     "keywords": [
@@ -408,9 +408,9 @@
   {
     "id": "chain_ln",
     "title": "Đạo hàm ln của hàm hợp",
-    "latex": "$(\\ln(u(x)))^{\\prime} = \\dfrac{u^{\\prime}(x)}{u(x)}$",
+    "latex": "(\\ln(u(x)))^{\\prime} = \\dfrac{u^{\\prime}(x)}{u(x)}",
     "explanation": "Áp dụng chain rule cho hàm ln.",
-    "example": "$(\\ln(3x^2+1))^{\\prime} = \\dfrac{6x}{3x^2+1}$",
+    "example": "(\\ln(3x^2+1))^{\\prime} = \\dfrac{6x}{3x^2+1}",
     "related_hypothesis": "H03_Chain",
     "difficulty": "medium",
     "keywords": [
@@ -422,9 +422,9 @@
   {
     "id": "implicit_chain",
     "title": "Ví dụ chain rule ẩn",
-    "latex": "$(x^2 + y^2 = 1) \\Rightarrow 2x + 2y y^{\\prime} = 0$",
+    "latex": "(x^2 + y^2 = 1) \\Rightarrow 2x + 2y y^{\\prime} = 0",
     "explanation": "Lấy đạo hàm hai vế rồi giải ra y^{\\prime}.",
-    "example": "$y^{\\prime} = -\\dfrac{x}{y}$",
+    "example": "y^{\\prime} = -\\dfrac{x}{y}",
     "related_hypothesis": "H03_Chain",
     "difficulty": "hard",
     "keywords": [
@@ -436,9 +436,9 @@
   {
     "id": "nested_chain",
     "title": "Đạo hàm hàm hợp lồng nhau",
-    "latex": "$(e^{\\sin(x^2)})^{\\prime} = e^{\\sin(x^2)}\\cos(x^2) \\cdot 2x$",
+    "latex": "(e^{\\sin(x^2)})^{\\prime} = e^{\\sin(x^2)}\\cos(x^2) \\cdot 2x",
     "explanation": "Áp dụng chain rule nhiều lần từ lớp ngoài vào lớp trong.",
-    "example": "$(e^{\\sin(x^2)})^{\\prime} = 2xe^{\\sin(x^2)}\\cos(x^2)$",
+    "example": "(e^{\\sin(x^2)})^{\\prime} = 2xe^{\\sin(x^2)}\\cos(x^2)",
     "related_hypothesis": "H03_Chain",
     "difficulty": "hard",
     "keywords": [

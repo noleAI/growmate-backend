@@ -145,7 +145,7 @@
         },
         {
           "id": "B",
-          "text": "\\dfrac{1}{x}",
+          "text": "1/x",
           "text_latex": "$\\dfrac{1}{x}$"
         },
         {
@@ -155,7 +155,7 @@
         },
         {
           "id": "D",
-          "text": "\\dfrac{1}{(x^2)}",
+          "text": "1/(x^2)",
           "text_latex": "$\\dfrac{1}{x^2}$"
         }
       ],
@@ -263,22 +263,22 @@
       "order": 9,
       "difficulty": "hard",
       "weight": 3,
-      "content": "Đạo hàm của y = \\dfrac{(x+1)}{(x-1)} là gì?",
+      "content": "Đạo hàm của y = (x+1)/(x-1) là gì?",
       "content_latex": "Đạo hàm của $y = \\dfrac{x + 1}{x - 1}$ là gì?",
       "options": [
         {
           "id": "A",
-          "text": "\\dfrac{2}{(x-1)}^2",
+          "text": "2/(x-1)^2",
           "text_latex": "$\\dfrac{2}{(x - 1)^2}$"
         },
         {
           "id": "B",
-          "text": "\\dfrac{-2}{(x-1)}^2",
+          "text": "-2/(x-1)^2",
           "text_latex": "$-\\dfrac{2}{(x - 1)^2}$"
         },
         {
           "id": "C",
-          "text": "\\dfrac{1}{(x-1)}",
+          "text": "1/(x-1)",
           "text_latex": "$\\dfrac{1}{x - 1}$"
         },
         {
