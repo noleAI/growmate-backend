@@ -170,6 +170,96 @@ class QuizService:
             return ""
         return str(uuid.uuid5(self.TEMPLATE_NAMESPACE, normalized_question_id))
 
+    def get_question_review_material(self, question_id: str) -> dict[str, Any]:
+        normalized_question_id = str(question_id or "").strip()
+        if not normalized_question_id:
+            return {}
+
+        question = self._question_by_id.get(normalized_question_id)
+        if not isinstance(question, dict):
+            return {}
+
+        payload = question.get("payload")
+        if not isinstance(payload, dict):
+            payload = {}
+
+        material: dict[str, Any] = {
+            "content": str(question.get("content") or ""),
+            "media_url": question.get("media_url"),
+        }
+
+        question_type = str(question.get("question_type") or "").upper()
+        if question_type == "MULTIPLE_CHOICE":
+            options = payload.get("options")
+            if not isinstance(options, list):
+                options = []
+
+            material["answer_key"] = {
+                "kind": "multiple_choice",
+                "correct_option_id": str(payload.get("correct_option_id") or "").strip().upper(),
+                "options": [
+                    {
+                        "id": str(item.get("id") or "").strip(),
+                        "text": str(item.get("text") or ""),
+                    }
+                    for item in options
+                    if isinstance(item, dict)
+                ],
+            }
+
+        elif question_type == "SHORT_ANSWER":
+            accepted_answers = payload.get("accepted_answers")
+            if not isinstance(accepted_answers, list):
+                accepted_answers = []
+
+            exact_answer = str(payload.get("exact_answer") or "").strip()
+            unique_answers: list[str] = []
+            if exact_answer:
+                unique_answers.append(exact_answer)
+
+            for item in accepted_answers:
+                candidate = str(item or "").strip()
+                if candidate and candidate not in unique_answers:
+                    unique_answers.append(candidate)
+
+            answer_key: dict[str, Any] = {
+                "kind": "short_answer",
+                "exact_answer": exact_answer,
+                "accepted_answers": unique_answers,
+            }
+
+            unit = payload.get("unit")
+            if unit is not None:
+                answer_key["unit"] = str(unit)
+
+            tolerance = payload.get("tolerance")
+            if tolerance is not None:
+                answer_key["tolerance"] = tolerance
+
+            material["answer_key"] = answer_key
+
+        elif question_type == "TRUE_FALSE_CLUSTER":
+            sub_questions = payload.get("sub_questions")
+            if not isinstance(sub_questions, list):
+                sub_questions = []
+
+            material["answer_key"] = {
+                "kind": "true_false_cluster",
+                "general_hint": str(payload.get("general_hint") or ""),
+                "sub_questions": [
+                    {
+                        "id": str(item.get("id") or "").strip(),
+                        "text": str(item.get("text") or ""),
+                        "is_true": bool(item.get("is_true", False)),
+                        "explanation": str(item.get("explanation") or ""),
+                    }
+                    for item in sub_questions
+                    if isinstance(item, dict)
+                ],
+            }
+
+        return material
+
     def _sanitize_question_for_delivery(
         self,
         session_id: str,
