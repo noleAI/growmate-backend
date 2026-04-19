@@ -26,6 +26,7 @@ class SessionResponse(BaseModel):
     status: str
     start_time: str
     initial_state: Dict[str, Any]
+    reused_existing_session: bool = False
 
 
 class InteractionResponse(BaseModel):

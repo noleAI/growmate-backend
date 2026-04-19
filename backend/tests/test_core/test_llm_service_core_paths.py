@@ -151,6 +151,27 @@ async def test_generate_chat_response_exception_returns_fallback(
 
 
 @pytest.mark.asyncio
+async def test_generate_chat_response_return_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = _service_with_no_model(monkeypatch)
+    _mark_ready(service)
+
+    monkeypatch.setattr(service, "_call_model", lambda *_args, **_kwargs: "assistant-answer")
+
+    result = await service.generate_chat_response(
+        system_prompt="sys",
+        history=[],
+        user_message="q",
+        use_search=False,
+        return_metadata=True,
+    )
+
+    assert result == {
+        "reply": "assistant-answer",
+        "processing": {"search_requested": False, "used_search": False},
+    }
+
+
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_image_not_ready_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -202,6 +223,29 @@ async def test_generate_chat_response_with_image_exception_fallback(
     )
 
     assert result == "fb"
+
+
+@pytest.mark.asyncio
+async def test_generate_chat_response_with_image_return_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _service_with_no_model(monkeypatch)
+    _mark_ready(service)
+
+    monkeypatch.setattr(service, "_call_model", lambda *_args, **_kwargs: "vision-answer")
+
+    result = await service.generate_chat_response_with_image(
+        system_prompt="sys",
+        user_message="q",
+        image_bytes=b"123",
+        image_mime_type="image/png",
+        return_metadata=True,
+    )
+
+    assert result == {
+        "reply": "vision-answer",
+        "processing": {"image_analyzed": True, "image_mime_type": "image/png"},
+    }
 
 
 @pytest.mark.asyncio

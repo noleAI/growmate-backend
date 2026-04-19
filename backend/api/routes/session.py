@@ -179,6 +179,62 @@ def _build_pending_session_payload(row: dict) -> dict:
     }
 
 
+def _enrich_initial_state_for_resume(
+    *,
+    initial_state: dict,
+    pending_row: dict,
+    request: SessionCreateRequest,
+    student_id: str,
+    fallback_mode: str,
+) -> dict:
+    state = copy.deepcopy(initial_state) if isinstance(initial_state, dict) else {}
+    pending_payload = _build_pending_session_payload(pending_row)
+    snapshot = pending_row.get("state_snapshot")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+    snapshot_strategy = snapshot.get("strategy_state")
+    if not isinstance(snapshot_strategy, dict):
+        snapshot_strategy = {}
+
+    classification_level = str(
+        state.get("classification_level")
+        or snapshot.get("user_classification_level")
+        or snapshot_strategy.get("classification_level")
+        or request.classification_level
+        or "intermediate"
+    )
+    mode = str(
+        state.get("mode")
+        or pending_payload.get("mode")
+        or snapshot.get("mode")
+        or snapshot_strategy.get("mode")
+        or fallback_mode
+    ).strip() or fallback_mode
+
+    state.setdefault("subject", request.subject)
+    state.setdefault("topic", request.topic)
+    state.setdefault("beliefs", copy.deepcopy(bayesian_tracker.beliefs))
+    state["student_id"] = student_id
+    state["classification_level"] = classification_level
+    state["mode"] = mode
+    state["last_question_index"] = int(pending_payload["last_question_index"])
+    state["progress_percent"] = int(pending_payload["progress_percent"])
+    state["total_questions"] = int(pending_payload["total_questions"])
+
+    strategy_state = state.get("strategy_state")
+    if not isinstance(strategy_state, dict):
+        strategy_state = {}
+    strategy_state["mode"] = mode
+    strategy_state["classification_level"] = classification_level
+    strategy_state["student_id"] = student_id
+    strategy_state["last_question_index"] = int(pending_payload["last_question_index"])
+    strategy_state["progress_percent"] = int(pending_payload["progress_percent"])
+    strategy_state["total_questions"] = int(pending_payload["total_questions"])
+    state["strategy_state"] = strategy_state
+
+    return state
+
+
 @router.post("", response_model=SessionResponse)
 async def create_session(
     request: SessionCreateRequest,
@@ -205,30 +261,13 @@ async def create_session(
         if isinstance(pending_row, dict) and pending_row.get("id"):
             existing_session_id = str(pending_row.get("id")).strip()
             existing_state = memory_store.get_session_state(existing_session_id)
-            snapshot = pending_row.get("state_snapshot")
-            if not isinstance(snapshot, dict):
-                snapshot = {}
-            snapshot_strategy = snapshot.get("strategy_state")
-            if not isinstance(snapshot_strategy, dict):
-                snapshot_strategy = {}
-
-            initial_state = existing_state or {
-                "subject": request.subject,
-                "topic": request.topic,
-                "beliefs": copy.deepcopy(bayesian_tracker.beliefs),
-                "student_id": student_id,
-                "classification_level": str(
-                    snapshot.get("user_classification_level")
-                    or snapshot_strategy.get("classification_level")
-                    or request.classification_level
-                    or "intermediate"
-                ),
-                "mode": str(
-                    snapshot.get("mode")
-                    or snapshot_strategy.get("mode")
-                    or mode
-                ),
-            }
+            initial_state = _enrich_initial_state_for_resume(
+                initial_state=existing_state or {},
+                pending_row=pending_row,
+                request=request,
+                student_id=student_id,
+                fallback_mode=mode,
+            )
             memory_store.save_session_state(existing_session_id, initial_state)
 
             return SessionResponse(
@@ -239,6 +278,7 @@ async def create_session(
                     or datetime.now(UTC).isoformat()
                 ),
                 initial_state=initial_state,
+                reused_existing_session=True,
             )
 
     session_id = str(uuid.uuid4())
@@ -295,6 +335,9 @@ async def create_session(
         "student_id": student_id,
         "classification_level": classification_level,
         "mode": mode,
+        "last_question_index": 0,
+        "progress_percent": 0,
+        "total_questions": 10,
     }
     memory_store.save_session_state(session_id, state)
 
@@ -346,6 +389,7 @@ async def create_session(
         status="active",
         start_time=datetime.now(UTC).isoformat(),
         initial_state=state,
+        reused_existing_session=False,
     )
 
 
